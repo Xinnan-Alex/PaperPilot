@@ -44,7 +44,7 @@ async def current_user(
 
     schema, _, token = authorization.partition(" ")
     if schema.lower() != "bearer" or not token:
-        raise AuthError("Authorization header must be: BEearer <token>")
+        raise AuthError("Authorization header must be: Bearer <token>")
 
     payload = verify_token(token)
     user_id: str = payload.get("sub", "")

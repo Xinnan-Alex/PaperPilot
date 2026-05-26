@@ -3,7 +3,7 @@ from contextvars import ContextVar
 
 import structlog
 
-request_id_var: ContextVar[str] = ContextVar("requst_id", default="")
+request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
 
 def configure_logging(env: str = "local"):

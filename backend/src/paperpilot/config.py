@@ -14,7 +14,11 @@ class Settings(BaseSettings):
     voyage_api_key: str = ""
     embedding_model: str = "voyage-3-lite"
     embedding_dim: int = 512
+    ocr_language: str = "eng"
     frontend_origins: str = "http://localhost:5173"
+    judge_model: str = "gpt-4o-mini"
+    judge_base_url: str = "https://api.openai.com/v1"
+    judge_api_key: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
