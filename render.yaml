@@ -5,7 +5,7 @@ services:
     runtime: docker
     rootDir: backend
 
-    healthCheckPath: /heath
+    healthCheckPath: /health
     envVars:
       - key: ENV
         value: production
