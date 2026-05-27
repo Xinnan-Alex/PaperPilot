@@ -1,6 +1,7 @@
 services:
   - type: web
     name: paperpilot-api
+    plan: free
     runtime: python
     rootDir: backend
     buildCommand: apt-get update && apt-get install -y tesseract-ocr poppler-utils && pip install uv && uv sync --frozen
