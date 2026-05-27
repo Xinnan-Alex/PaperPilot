@@ -132,3 +132,18 @@ async def list_documents(
     """)
     result = await session.execute(stmt, {"user_id": user_id})
     return [dict(row._mapping) for row in result.fetchall()]
+
+
+async def get_document(
+    session: AsyncSession,
+    user_id: str,
+    doc_id: str,
+) -> dict[str, Any] | None:
+    stmt = text("""
+        SELECT id, filename, status, created_at
+        FROM documents
+        WHERE id = :doc_id AND user_id = :user_id
+    """)
+    result = await session.execute(stmt, {"doc_id": doc_id, "user_id": user_id})
+    row = result.fetchone()
+    return dict(row._mapping) if row else None

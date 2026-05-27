@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: paperpilot-api
+    runtime: python
+    rootDir: backend
+    buildCommand: apt-get update && apt-get install -y tesseract-ocr poppler-utils && pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn paperpilot-api:api --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /heath
+    envVars:
+      - key: ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: documents
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.deepseek.com
+      - key: LLM_MODEL
+        value: deepseek-chat
+      - key: VOYAGE_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        value: voyage-3-lite
+      - key: EMBEDDING_DIM
+        value: "512"
+      - key: OCR_LANGUAGE
+        value: eng
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"
