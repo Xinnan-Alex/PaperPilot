@@ -11,7 +11,8 @@ COPY pyproject.toml uv.lock* ./
 RUN pip install uv && uv sync --frozen --no-dev
 
 COPY . .
+RUN uv sync --frozen --no-dev
 
 EXPOSE 10000
 
-CMD ["uv", "run", "uvicorn", "paperpilot-api:api", "--host", "0.0.0.0", "--port", "10000"]
+CMD ["uv", "run", "uvicorn", "paperpilot.api:app", "--host", "0.0.0.0", "--port", "10000"]
