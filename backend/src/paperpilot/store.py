@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,10 +16,10 @@ async def insert_document(
     filename: str,
     storage_path: str,
 ) -> str:
-    doc_id = str(uuid.uuid4())
+    doc_id: str = str(uuid.uuid4())
     stmt = text("""
-                INSERT INTO documents (id, user_id, filename, storage_path, status, created_at)
-                VALUES (:id, :user_id, :filename, :storage_path, 'pending', :now)
+        INSERT INTO documents (id, user_id, filename, storage_path, status, created_at)
+        VALUES (:id, :user_id, :filename, :storage_path, 'pending', :now)
     """)
     await session.execute(
         stmt,
@@ -28,7 +31,6 @@ async def insert_document(
             "now": datetime.utcnow(),
         },
     )
-
     await session.commit()
     return doc_id
 
@@ -39,14 +41,12 @@ async def insert_chunks(
     document_id: str,
     chunks: list[Chunk],
     batch_size: int = 100,
-):
+) -> None:
     for i in range(0, len(chunks), batch_size):
-        batch = chunks[i : i + batch_size]
+        batch: list[Chunk] = chunks[i:i + batch_size]
         for chunk in batch:
-            chunk_id = str(uuid.uuid4())
-            embedding_str = (
-                f"[{','.join(str(v) for v in chunk.embedding)}]" if chunk.embedding else None
-            )
+            chunk_id: str = str(uuid.uuid4())
+            embedding_str: str | None = f"[{','.join(str(v) for v in chunk.embedding)}]" if chunk.embedding else None
             stmt = text("""
                 INSERT INTO chunks (id, document_id, user_id, ordinal, page, text, embedding)
                 VALUES (:id, :document_id, :user_id, :ordinal, :page, :text, CAST(:embedding AS vector))
@@ -70,7 +70,7 @@ async def update_document_status(
     session: AsyncSession,
     document_id: str,
     status: str,
-):
+) -> None:
     stmt = text("UPDATE documents SET status = :status WHERE id = :id")
     await session.execute(stmt, {"status": status, "id": document_id})
     await session.commit()
@@ -82,33 +82,30 @@ async def search_vectors(
     query_embedding: list[float],
     k: int = 5,
     doc_ids: list[str] | None = None,
-) -> list[dict[str, object]]:
-    embedding_str = f"[{','.join(str(v) for v in query_embedding)}]"
+) -> list[dict[str, Any]]:
+    embedding_str: str = f"[{','.join(str(v) for v in query_embedding)}]"
 
     if doc_ids and len(doc_ids) > 0:
         stmt = text("""
-            SELECT c.id, c.ordinal, c.page, c.text, c.embedding <=> CAST(:embedding AS vector) AS distance,
-            d.filename
+            SELECT c.id, c.ordinal, c.page, c.text,
+                   c.embedding <=> CAST(:embedding AS vector) AS distance,
+                   d.filename
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE c.user_id = :user_id
-            AND c.document_id = ANY(CAST(:doc_ids AS uuid[]))
+              AND c.document_id = ANY(CAST(:doc_ids AS uuid[]))
             ORDER BY c.embedding <=> CAST(:embedding AS vector)
             LIMIT :k
         """)
         result = await session.execute(
             stmt,
-            {
-                "user_id": user_id,
-                "embedding": embedding_str,
-                "doc_ids": doc_ids,
-                "k": k,
-            },
+            {"user_id": user_id, "embedding": embedding_str, "doc_ids": doc_ids, "k": k},
         )
     else:
         stmt = text("""
-            SELECT c.id, c.ordinal, c.page, c.text, c.embedding <=> CAST(:embedding AS vector) AS distance,
-            d.filename
+            SELECT c.id, c.ordinal, c.page, c.text,
+                   c.embedding <=> CAST(:embedding AS vector) AS distance,
+                   d.filename
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE c.user_id = :user_id
@@ -116,12 +113,7 @@ async def search_vectors(
             LIMIT :k
         """)
         result = await session.execute(
-            stmt,
-            {
-                "user_id": user_id,
-                "embedding": embedding_str,
-                "k": k,
-            },
+            stmt, {"user_id": user_id, "embedding": embedding_str, "k": k}
         )
 
     rows = result.fetchall()
@@ -131,7 +123,7 @@ async def search_vectors(
 async def list_documents(
     session: AsyncSession,
     user_id: str,
-) -> list[dict[str, object]]:
+) -> list[dict[str, Any]]:
     stmt = text("""
         SELECT id, filename, status, created_at
         FROM documents

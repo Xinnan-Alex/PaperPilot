@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from paperpilot.models import Chunk, Page
@@ -5,40 +7,44 @@ from paperpilot.models import Chunk, Page
 
 def chunk_pages(pages: list[Page], size: int = 800, overlap: int = 100) -> list[Chunk]:
     chunks: list[Chunk] = []
-    ordinal = 0
+    ordinal: int = 0
 
     for page in pages:
-        page_chunks = _split_text(page.text, size, overlap)
+        page_chunks: list[str] = _split_text(page.text, size, overlap)
         for text in page_chunks:
-            chunks.append(Chunk(ordinal=ordinal, page=page.page_num, text=text))
+            chunks.append(
+                Chunk(ordinal=ordinal, page=page.page_num, text=text)
+            )
             ordinal += 1
 
     return chunks
 
 
 def _split_text(text: str, size: int, overlap: int) -> list[str]:
-    separators = ["\n\n", "\n", ". ", "! ", "? ", "; ", " ", ""]
+    separators: list[str] = ["\n\n", "\n", ". ", "! ", "? ", "; ", " ", ""]
     return _split_recursive(text, separators, size, overlap)
 
 
-def _split_recursive(text: str, separators: list[str], size: int, overlap: int) -> list[str]:
+def _split_recursive(
+    text: str, separators: list[str], size: int, overlap: int
+) -> list[str]:
     result: list[str] = []
     if len(text) <= size:
         if text.strip():
             result.append(text.strip())
         return result
 
-    sep = separators[0]
-    remaining_seps = separators[1:]
+    sep: str = separators[0]
+    remaining_seps: list[str] = separators[1:]
 
     if sep == "":
         return _naive_split(text, size, overlap)
 
-    splits = re.split(f"({re.escape(sep)})", text)
+    splits: list[str] = re.split(f"({re.escape(sep)})", text)
     merged: list[str] = []
-    i = 0
+    i: int = 0
     while i < len(splits):
-        part = splits[i]
+        part: str = splits[i]
         if i + 1 < len(splits):
             part += splits[i + 1]
             i += 2
@@ -46,7 +52,7 @@ def _split_recursive(text: str, separators: list[str], size: int, overlap: int) 
             i += 1
         merged.append(part)
 
-    current = ""
+    current: str = ""
     for segment in merged:
         if len(current) + len(segment) <= size:
             current += segment
@@ -69,7 +75,7 @@ def _split_recursive(text: str, separators: list[str], size: int, overlap: int) 
         overlapped: list[str] = []
         for i, chunk_text in enumerate(final):
             if i > 0:
-                prev_end = final[i - 1][-overlap:] if len(final[i - 1]) >= overlap else final[i - 1]
+                prev_end: str = final[i - 1][-overlap:] if len(final[i - 1]) >= overlap else final[i - 1]
                 chunk_text = prev_end + chunk_text
             overlapped.append(chunk_text)
         return overlapped
@@ -79,9 +85,9 @@ def _split_recursive(text: str, separators: list[str], size: int, overlap: int) 
 
 def _naive_split(text: str, size: int, overlap: int) -> list[str]:
     chunks: list[str] = []
-    start = 0
+    start: int = 0
     while start < len(text):
-        end = min(start + size, len(text))
+        end: int = min(start + size, len(text))
         chunks.append(text[start:end].strip())
         start += size - overlap
     return chunks

@@ -1,4 +1,4 @@
-from typing import cast
+from __future__ import annotations
 
 import voyageai
 
@@ -15,21 +15,26 @@ def _get_client() -> voyageai.Client:
 
 
 def embed_documents(texts: list[str], batch_size: int = 128) -> list[list[float]]:
-    client = _get_client()
+    client: voyageai.Client = _get_client()
     all_embeddings: list[list[float]] = []
+
     for i in range(0, len(texts), batch_size):
-        batch = texts[i : i + batch_size]
+        batch: list[str] = texts[i:i + batch_size]
         result = client.embed(
             batch,
             model=settings.embedding_model,
             input_type="document",
         )
-        all_embeddings.extend(cast(list[list[float]], result.embeddings))
+        all_embeddings.extend(result.embeddings)
 
     return all_embeddings
 
 
 def embed_query(text: str) -> list[float]:
-    client = _get_client()
-    result = client.embed([text], model=settings.embedding_model, input_type="query")
-    return cast(list[float], result.embeddings[0])
+    client: voyageai.Client = _get_client()
+    result = client.embed(
+        [text],
+        model=settings.embedding_model,
+        input_type="query",
+    )
+    return result.embeddings[0]
