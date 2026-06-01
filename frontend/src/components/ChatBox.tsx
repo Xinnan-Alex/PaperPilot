@@ -42,6 +42,23 @@ function CitationMark({
   );
 }
 
+function ThinkingBubble() {
+  return (
+    <div className="flex items-center gap-1 py-1" aria-label="Thinking">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="h-2 w-2 rounded-full bg-muted-foreground"
+          style={{
+            animation: "thinking-bounce 1.4s ease-in-out infinite",
+            animationDelay: `${i * 0.2}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -257,7 +274,9 @@ export default function ChatBox() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
-                        {renderContext(msg.content, msg.sources)}
+                        {msg.content
+                          ? renderContext(msg.content, msg.sources)
+                          : streaming && <ThinkingBubble />}
                       </div>
                       {typeof msg.confidence === "number" && (
                         <p className="mt-2 text-xs text-muted-foreground">
