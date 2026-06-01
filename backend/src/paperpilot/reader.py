@@ -9,7 +9,6 @@ from paperpilot.embed import embed_query
 from paperpilot.llm import stream_chat
 from paperpilot.retrieve import hybrid_search
 
-
 SYSTEM_PROMPT: str = """You are a helpful research assistant answering questions about the user's documents.
 
 Rules:
@@ -55,8 +54,10 @@ async def answer(
         )
 
     if not chunks:
-        yield "event: token\ndata: I couldn't find any relevant documents to answer your question.\n\n"
+        no_context_msg = "I couldn't find any relevant documents to answer your question."
+        yield f"event: token\ndata: {json.dumps(no_context_msg)}\n\n"
         yield "event: sources\ndata: []\n\n"
+        yield "event: confidence\ndata: 0.0\n\n"
         yield "event: done\ndata: \n\n"
         return
 
@@ -70,15 +71,22 @@ async def answer(
     sources_data: list[dict[str, Any]] = []
     for chunk in chunks:
         chunk_id: str = str(chunk.get("id", ""))
+        document_id: str = str(chunk.get("document_id", ""))
         sources_data.append(
             {
                 "chunk_id": chunk_id,
+                "document_id": document_id,
                 "ordinal": chunk.get("ordinal", 0),
                 "page": chunk.get("page"),
                 "text": chunk.get("text", ""),
                 "document_filename": chunk.get("filename", "unknown"),
+                "source_url": f"/documents/{document_id}/download-url",
             }
         )
 
+    # Simple retrieval confidence for the demo: more supporting chunks = higher confidence.
+    confidence: float = min(1.0, len(chunks) / max(top_k, 1))
+
     yield f"event: sources\ndata: {json.dumps(sources_data)}\n\n"
+    yield f"event: confidence\ndata: {confidence:.2f}\n\n"
     yield "event: done\ndata: \n\n"

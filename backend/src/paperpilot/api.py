@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import time
+import uuid as _uuid
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import PosixPath
 from typing import Any
-import uuid as _uuid
+from urllib.parse import quote
 
 import httpx
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -14,7 +16,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from paperpilot.auth import current_user
+from paperpilot.auth import AuthError, current_user
 from paperpilot.chunk import chunk_pages
 from paperpilot.config import settings
 from paperpilot.db import get_db
@@ -57,6 +59,29 @@ app.add_middleware(
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/hour"])
 app.state.limiter = limiter
 
+metrics: dict[str, float | int] = {
+    "requests_total": 0,
+    "errors_total": 0,
+    "latency_total_ms": 0.0,
+}
+
+
+def supabase_admin_headers(content_type: str | None = None) -> dict[str, str]:
+    headers: dict[str, str] = {"apikey": settings.supabase_secret_key}
+    if content_type:
+        headers["Content-Type"] = content_type
+    return headers
+
+
+def supabase_user_headers(access_token: str, content_type: str | None = None) -> dict[str, str]:
+    headers: dict[str, str] = {
+        "apikey": settings.supabase_publishable_key or settings.supabase_secret_key,
+        "Authorization": f"Bearer {access_token}",
+    }
+    if content_type:
+        headers["Content-Type"] = content_type
+    return headers
+
 
 def get_user_key(request: Request) -> str:
     user_id: str | None = getattr(request.state, "user_id", None)
@@ -71,7 +96,13 @@ async def request_id_middleware(
 ) -> Response:
     rid: str = generate_request_id()
     request_id_var.set(rid)
+    start = time.perf_counter()
     response = await call_next(request)
+    latency_ms = (time.perf_counter() - start) * 1000
+    metrics["requests_total"] += 1
+    metrics["latency_total_ms"] += latency_ms
+    if response.status_code >= 500:
+        metrics["errors_total"] += 1
     response.headers["X-Request-ID"] = rid
     return response
 
@@ -90,6 +121,18 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/status")
+async def status() -> dict[str, float | int | str]:
+    requests_total = int(metrics["requests_total"])
+    avg_latency_ms = float(metrics["latency_total_ms"]) / requests_total if requests_total else 0.0
+    return {
+        "status": "ok",
+        "requests_total": requests_total,
+        "errors_total": int(metrics["errors_total"]),
+        "avg_latency_ms": round(avg_latency_ms, 2),
+    }
+
+
 @app.get("/me", response_model=MeResponse)
 async def me(request: Request, user_id: str = Depends(current_user)) -> dict[str, str]:
     return {"user_id": user_id, "email": getattr(request.state, "user_email", "")}
@@ -102,19 +145,26 @@ async def upload_file(
     file: UploadFile = File(...),
     user_id: str = Depends(current_user),
 ) -> dict[str, str]:
-    allowed_exts: set[str] = {".pdf", ".docx", ".doc", ".txt", ".text", ".md", ".html", ".htm"}
+    max_upload_bytes = 20 * 1024 * 1024  # 20 MB demo limit
+    allowed_exts: set[str] = {".pdf", ".docx", ".txt", ".text", ".md", ".html", ".htm"}
     ext: str = PosixPath(file.filename).suffix.lower() if file.filename else ""
 
     if ext not in allowed_exts:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type:{ext}")
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     contents: bytes = await file.read()
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(status_code=413, detail="File too large. Max upload size is 20 MB.")
 
-    storage_path: str = f"documents/{user_id}/{file.filename}"
-    upload_headers: dict[str, str] = {
-        "Authorization": f"Bearer {settings.supabase_secret_key}",
-        "x-upsert": "true",
-    }
+    access_token: str | None = getattr(request.state, "access_token", None)
+    if not access_token:
+        raise AuthError("Missing access token")
+
+    original_filename = file.filename or f"upload{ext}"
+    storage_path: str = f"{user_id}/{_uuid.uuid4()}{ext}"
+    upload_headers = supabase_user_headers(
+        access_token, file.content_type or "application/octet-stream"
+    )
     async with httpx.AsyncClient(timeout=30) as client:
         resp: httpx.Response = await client.post(
             f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
@@ -126,15 +176,15 @@ async def upload_file(
             raise HTTPException(status_code=502, detail=f"Storage upload failed: {resp.text}")
 
     async for session in get_db():
-        doc_id: str = await insert_document(session, user_id, file.filename, storage_path)
-        return {"doc_id": doc_id, "filename": file.filename}
+        doc_id: str = await insert_document(session, user_id, original_filename, storage_path)
+        return {"doc_id": doc_id, "filename": original_filename}
 
 
 async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage_path: str) -> None:
     async with httpx.AsyncClient(timeout=30) as client:
         download_resp: httpx.Response = await client.get(
             f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
-            headers={"Authorization": f"Bearer {settings.supabase_secret_key}"},
+            headers=supabase_admin_headers(),
         )
         if download_resp.status_code >= 400:
             async for session in get_db():
@@ -143,7 +193,7 @@ async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage
 
         file_bytes: bytes = download_resp.content
 
-    tmp_path: PosixPath = PosixPath(f"/tmp/pilot_{doc_id}.dat")
+    tmp_path: PosixPath = PosixPath(f"/tmp/pilot_{doc_id}{PosixPath(filename).suffix.lower()}")
     tmp_path.write_bytes(file_bytes)
 
     try:
@@ -205,7 +255,7 @@ async def ingest_document(
     return {"doc_id": body.doc_id, "status": "processing"}
 
 
-@app.get("/document/{doc_id}", response_model=DocumentOut)
+@app.get("/documents/{doc_id}", response_model=DocumentOut)
 async def get_document_status(
     doc_id: str,
     user_id: str = Depends(current_user),
@@ -216,6 +266,37 @@ async def get_document_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return DocumentOut(**doc)
+
+
+@app.get("/documents/{doc_id}/download-url")
+async def get_document_download_url(
+    doc_id: str,
+    user_id: str = Depends(current_user),
+) -> dict[str, str]:
+    async for session in get_db():
+        from sqlalchemy import text
+
+        result = await session.execute(
+            text("SELECT storage_path FROM documents WHERE id = :id AND user_id = :user_id"),
+            {"id": doc_id, "user_id": user_id},
+        )
+        row = result.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Document not found")
+        storage_path: str = row[0]
+
+    encoded_path = quote(storage_path, safe="/")
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            f"{settings.supabase_url}/storage/v1/object/sign/{settings.supabase_storage_bucket}/{encoded_path}",
+            headers=supabase_admin_headers(),
+            json={"expiresIn": 300},
+        )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Signed URL failed: {resp.text}")
+
+    signed_path: str = resp.json().get("signedURL", "")
+    return {"url": f"{settings.supabase_url}/storage/v1{signed_path}"}
 
 
 @app.post("/query")
@@ -251,8 +332,19 @@ async def submit_feedback(
     async for session in get_db():
         from sqlalchemy import text
 
+        # Validate that the referenced chunks belong to this user.
+        if body.retrieved_chunk_ids:
+            ownership = await session.execute(
+                text(
+                    "SELECT count(*) FROM chunks WHERE user_id = :user_id AND id = ANY(CAST(:ids AS uuid[]))"
+                ),
+                {"user_id": user_id, "ids": body.retrieved_chunk_ids},
+            )
+            if ownership.scalar_one() != len(body.retrieved_chunk_ids):
+                raise HTTPException(status_code=400, detail="Feedback references unknown chunks")
+
         fid: str = str(_uuid.uuid4())
-        now: datetime = datetime.now(datetime.UTC)
+        now: datetime = datetime.now(tz=datetime.timezone.utc)
         stmt = text("""
             INSERT INTO feedback (id, user_id, query, answer, rating, retrieved_chunk_ids, created_at) VALUES (:id, :user_id, :query, :answer, :rating, :chunk_ids, :now)
         """)

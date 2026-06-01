@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from paperpilot.config import settings
@@ -7,12 +8,20 @@ from paperpilot.logging import log
 from paperpilot.models import Page
 
 
+def _clean_text(text: str) -> str:
+    # Minimal normalization: normalize line endings, collapse whitespace, limit blank lines.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def extract_text(file_path: str) -> list[Page]:
     ext: str = Path(file_path).suffix.lower()
 
     if ext == ".pdf":
         return _extract_pdf(file_path)
-    elif ext in (".docx", ".doc"):
+    elif ext == ".docx":
         return _extract_docx(file_path)
     elif ext in (".txt", ".text", ".md"):
         return _extract_text(file_path)
@@ -40,14 +49,18 @@ def _extract_pdf(file_path: str) -> list[Page]:
 
 def _ocr_pdf_page(file_path: str, page_index: int) -> str | None:
     try:
-        from pdf2image import convert_from_path
         import pytesseract
+        from pdf2image import convert_from_path
     except ImportError:
-        log.warning("ocr_dependencies_missing", message="Install pytesseract and pdf2image for OCR support")
+        log.warning(
+            "ocr_dependencies_missing", message="Install pytesseract and pdf2image for OCR support"
+        )
         return None
 
     try:
-        images = convert_from_path(file_path, first_page=page_index + 1, last_page=page_index + 1, dpi=300)
+        images = convert_from_path(
+            file_path, first_page=page_index + 1, last_page=page_index + 1, dpi=300
+        )
         if not images:
             return None
         text: str = pytesseract.image_to_string(images[0], lang=settings.ocr_language)
@@ -62,12 +75,13 @@ def _extract_docx(file_path: str) -> list[Page]:
 
     doc = Document(file_path)
     full_text: str = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-    return [Page(page_num=1, text=full_text)] if full_text.strip() else []
+    full_text = _clean_text(full_text)
+    return [Page(page_num=1, text=full_text)] if full_text else []
 
 
 def _extract_text(file_path: str) -> list[Page]:
-    text: str = Path(file_path).read_text(encoding="utf-8")
-    return [Page(page_num=1, text=text)] if text.strip() else []
+    text: str = _clean_text(Path(file_path).read_text(encoding="utf-8"))
+    return [Page(page_num=1, text=text)] if text else []
 
 
 def _extract_html(file_path: str) -> list[Page]:
@@ -75,5 +89,7 @@ def _extract_html(file_path: str) -> list[Page]:
 
     html: str = Path(file_path).read_text(encoding="utf-8")
     soup = BeautifulSoup(html, "lxml")
-    text: str = soup.get_text(separator="\n")
-    return [Page(page_num=1, text=text)] if text.strip() else []
+    for tag in soup(["script", "style", "nav", "footer"]):
+        tag.decompose()
+    text: str = _clean_text(soup.get_text(separator="\n"))
+    return [Page(page_num=1, text=text)] if text else []

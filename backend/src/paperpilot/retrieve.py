@@ -21,13 +21,14 @@ async def bm25_search(
     doc_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     stmt = text("""
-        SELECT id, ordinal, page, text, document_id
-        FROM chunks
-        WHERE user_id = :user_id
+        SELECT c.id, c.document_id, c.ordinal, c.page, c.text, d.filename, d.storage_path
+        FROM chunks c
+        JOIN documents d ON c.document_id = d.id
+        WHERE c.user_id = :user_id
     """)
     params: dict[str, Any] = {"user_id": user_id}
     if doc_ids:
-        stmt = text(stmt.text + " AND document_id = ANY(CAST(:doc_ids AS uuid[]))")
+        stmt = text(stmt.text + " AND c.document_id = ANY(CAST(:doc_ids AS uuid[]))")
         params["doc_ids"] = doc_ids
 
     result = await session.execute(stmt, params)
@@ -57,8 +58,12 @@ async def hybrid_search(
     k: int = 5,
     doc_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    vector_results: list[dict[str, Any]] = await search_vectors(session, user_id, query_embedding, k=k * 2, doc_ids=doc_ids)
-    bm25_results: list[dict[str, Any]] = await bm25_search(session, user_id, query, k=k * 2, doc_ids=doc_ids)
+    vector_results: list[dict[str, Any]] = await search_vectors(
+        session, user_id, query_embedding, k=k * 2, doc_ids=doc_ids
+    )
+    bm25_results: list[dict[str, Any]] = await bm25_search(
+        session, user_id, query, k=k * 2, doc_ids=doc_ids
+    )
 
     scores: dict[str, float] = {}
 
@@ -75,5 +80,7 @@ async def hybrid_search(
         if r["id"] not in merged:
             merged[r["id"]] = r
 
-    ranked: list[dict[str, Any]] = sorted(merged.values(), key=lambda r: scores.get(r["id"], 0), reverse=True)
+    ranked: list[dict[str, Any]] = sorted(
+        merged.values(), key=lambda r: scores.get(r["id"], 0), reverse=True
+    )
     return ranked[:k]

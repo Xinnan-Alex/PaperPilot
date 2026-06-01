@@ -51,6 +51,7 @@ async def current_user(
         raise AuthError("Authorization header must be: Bearer <token>")
 
     payload = verify_token(token)
+    request.state.access_token = token
     user_id: str = payload.get("sub", "")
     if not user_id:
         raise AuthError("Token missing user ID (sub claim)")

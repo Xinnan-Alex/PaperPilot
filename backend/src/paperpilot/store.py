@@ -43,10 +43,12 @@ async def insert_chunks(
     batch_size: int = 100,
 ) -> None:
     for i in range(0, len(chunks), batch_size):
-        batch: list[Chunk] = chunks[i:i + batch_size]
+        batch: list[Chunk] = chunks[i : i + batch_size]
         for chunk in batch:
             chunk_id: str = str(uuid.uuid4())
-            embedding_str: str | None = f"[{','.join(str(v) for v in chunk.embedding)}]" if chunk.embedding else None
+            embedding_str: str | None = (
+                f"[{','.join(str(v) for v in chunk.embedding)}]" if chunk.embedding else None
+            )
             stmt = text("""
                 INSERT INTO chunks (id, document_id, user_id, ordinal, page, text, embedding)
                 VALUES (:id, :document_id, :user_id, :ordinal, :page, :text, CAST(:embedding AS vector))
@@ -87,9 +89,9 @@ async def search_vectors(
 
     if doc_ids and len(doc_ids) > 0:
         stmt = text("""
-            SELECT c.id, c.ordinal, c.page, c.text,
+            SELECT c.id, c.document_id, c.ordinal, c.page, c.text,
                    c.embedding <=> CAST(:embedding AS vector) AS distance,
-                   d.filename
+                   d.filename, d.storage_path
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE c.user_id = :user_id
@@ -103,9 +105,9 @@ async def search_vectors(
         )
     else:
         stmt = text("""
-            SELECT c.id, c.ordinal, c.page, c.text,
+            SELECT c.id, c.document_id, c.ordinal, c.page, c.text,
                    c.embedding <=> CAST(:embedding AS vector) AS distance,
-                   d.filename
+                   d.filename, d.storage_path
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE c.user_id = :user_id
@@ -117,7 +119,10 @@ async def search_vectors(
         )
 
     rows = result.fetchall()
-    return [dict(row._mapping) for row in rows]
+    return [
+        {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in dict(row._mapping).items()}
+        for row in rows
+    ]
 
 
 async def list_documents(
@@ -131,7 +136,10 @@ async def list_documents(
         ORDER BY created_at DESC
     """)
     result = await session.execute(stmt, {"user_id": user_id})
-    return [dict(row._mapping) for row in result.fetchall()]
+    return [
+        {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in dict(row._mapping).items()}
+        for row in result.fetchall()
+    ]
 
 
 async def get_document(
@@ -146,4 +154,6 @@ async def get_document(
     """)
     result = await session.execute(stmt, {"doc_id": doc_id, "user_id": user_id})
     row = result.fetchone()
-    return dict(row._mapping) if row else None
+    if not row:
+        return None
+    return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in dict(row._mapping).items()}

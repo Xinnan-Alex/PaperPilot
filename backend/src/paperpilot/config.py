@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_jwks_url: str = ""
     supabase_secret_key: str = ""
+    supabase_publishable_key: str = ""
     supabase_db_url: str = ""
     supabase_storage_bucket: str = "documents"
     deepseek_api_key: str = ""

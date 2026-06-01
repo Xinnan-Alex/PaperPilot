@@ -32,8 +32,10 @@ async def do_ingest(args: argparse.Namespace) -> None:
 async def do_ask(args: argparse.Namespace) -> None:
     async for event in answer(args.query, args.user_id, top_k=args.k, doc_ids=args.doc_ids):
         if event.startswith("event: token"):
+            import json
+
             data = event.removeprefix("event: token\ndata: ").rstrip("\n")
-            print(data, end="", flush=True)
+            print(json.loads(data), end="", flush=True)
         elif event.startswith("event: sources"):
             print("\n\n--- Sources ---")
             import json
@@ -42,6 +44,9 @@ async def do_ask(args: argparse.Namespace) -> None:
             sources = json.loads(data)
             for s in sources:
                 print(f"  [{s['ordinal']}] {s['document_filename']} (p.{s.get('page', '?')})")
+        elif event.startswith("event: confidence"):
+            data = event.removeprefix("event: confidence\ndata: ").rstrip("\n")
+            print(f"\n\nConfidence: {data}")
         elif event.startswith("event: done"):
             pass
 
@@ -72,4 +77,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

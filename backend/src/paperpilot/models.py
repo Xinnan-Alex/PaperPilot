@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MeResponse(BaseModel):
@@ -26,17 +27,19 @@ class Chunk:
 
 
 class QueryRequest(BaseModel):
-    query: str
-    top_k: int = 5
+    query: str = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=20)
     doc_ids: list[str] | None = None
 
 
 class SourceChunk(BaseModel):
     chunk_id: str
+    document_id: str
     ordinal: int
     page: int | None
     text: str
     document_filename: str
+    source_url: str
 
 
 class IngestRequest(BaseModel):
@@ -51,9 +54,9 @@ class DocumentOut(BaseModel):
 
 
 class FeedbackIn(BaseModel):
-    query: str
-    answer: str
-    rating: int
+    query: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    rating: Literal[1, -1]  # 1 (thumbs up) or -1 (thumbs down)
     retrieved_chunk_ids: list[str]
 
 
