@@ -1,29 +1,35 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
 
-from openai import AsyncOpenAI
-
-from paperpilot.config import settings
-
-client: AsyncOpenAI = AsyncOpenAI(
-    api_key=settings.deepseek_api_key,
-    base_url=settings.llm_base_url,
-)
+import litellm
 
 
-async def stream_chat(
-    messages: list[dict[str, str]],
+async def stream_completion(
+    model: str,
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
     temperature: float = 0.3,
     max_tokens: int = 1024,
-) -> AsyncIterator[str]:
-    response = await client.chat.completions.create(
-        model=settings.llm_model,
-        messages=messages,  # type: ignore[arg-type]
-        temperature=temperature,
-        max_tokens=max_tokens,
-        stream=True,
-    )
+) -> AsyncIterator[Any]:
+    """Provider-agnostic streaming completion via LiteLLM.
+
+    Yields raw chunks; the caller is responsible for handling token deltas and
+    tool-call deltas. The chunk shape matches the OpenAI streaming format
+    regardless of underlying provider.
+    """
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+    if tools:
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
+
+    response = await litellm.acompletion(**kwargs)
     async for chunk in response:
-        if chunk.choices and chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+        yield chunk
