@@ -16,6 +16,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+import paperpilot.providers as _providers
 from paperpilot.auth import AuthError, current_user
 from paperpilot.chunk import chunk_pages
 from paperpilot.config import settings
@@ -136,6 +137,14 @@ async def status() -> dict[str, float | int | str]:
 @app.get("/me", response_model=MeResponse)
 async def me(request: Request, user_id: str = Depends(current_user)) -> dict[str, str]:
     return {"user_id": user_id, "email": getattr(request.state, "user_email", "")}
+
+
+@app.get("/models")
+async def list_available_models(user_id: str = Depends(current_user)) -> list[dict[str, str]]:
+    return [
+        {"id": m.id, "display_name": m.display_name, "provider": m.provider}
+        for m in _providers.available_models()
+    ]
 
 
 @app.post("/upload")
