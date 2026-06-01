@@ -1,23 +1,37 @@
+import { useState } from "react";
 import ChatBox from "@/components/ChatBox";
 import UploadBox from "@/components/UploadBox";
-import { useSession } from "@/hooks/useSession";
+import Sidebar from "@/components/Sidebar";
 
 export default function AppPage() {
-  const { user } = useSession();
+  const [showDocs, setShowDocs] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [chatKey, setChatKey] = useState(0);
+
+  const handleNewChat = () => {
+    setChatKey((k) => k + 1);
+  };
 
   return (
-    <main className="mx-auto flex h-svh max-w-4xl flex-col gap-0 p-4">
-      <header className="flex items-center justify-between border-b pb-3">
-        <h1 className="text-lg font-semibold">PaperPilot</h1>
-        <p className="text-sm text-muted-foreground">
-          {user?.email ?? user?.user_metadata?.user_name ?? "Signed in"}
-        </p>
-      </header>
+    <div className="flex h-svh w-full overflow-hidden bg-background">
+      <Sidebar
+        onNewChat={handleNewChat}
+        onToggleDocs={() => setShowDocs(!showDocs)}
+        showDocs={showDocs}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden pt-4">
-        <UploadBox />
-        <ChatBox />
-      </div>
-    </main>
+      <main className="flex flex-1 overflow-hidden">
+        {showDocs && (
+          <div className="w-80 border-r border-border bg-background overflow-y-auto">
+            <UploadBox />
+          </div>
+        )}
+        <div className="flex-1 overflow-hidden">
+          <ChatBox key={chatKey} onNewChat={handleNewChat} />
+        </div>
+      </main>
+    </div>
   );
 }
