@@ -1,10 +1,15 @@
 import {
   getDocumentDownloadUrl,
-  streamQuery,
+  chatStream,
   submitFeedback,
   listDocuments,
   type SSESource,
+  type StreamEvent,
 } from "@/lib/api";
+import ModelPicker from "./ModelPicker";
+import ToolCallBubble, { type ToolCallState } from "./ToolCallBubble";
+import { useModels } from "@/hooks/useModels";
+import type { ChatMessage, MessagePart } from "@/hooks/useChatSessions";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -19,7 +24,6 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
-import type { ChatMessage } from "@/hooks/useChatSessions";
 
 interface AvailableDoc {
   id: string;
@@ -62,6 +66,34 @@ function ThinkingBubble() {
   );
 }
 
+type EventHandlers = {
+  appendText: (text: string) => void;
+  pushTool: (tool: ToolCallState) => void;
+  updateTool: (id: string, mut: (t: ToolCallState) => ToolCallState) => void;
+  onSources: (sources: SSESource[]) => void;
+};
+
+function handleStreamEvent(event: StreamEvent, h: EventHandlers): void {
+  if (event.type === "token") {
+    h.appendText(event.data);
+  } else if (event.type === "tool_call") {
+    h.pushTool({
+      id: event.data.id,
+      name: event.data.name,
+      args: event.data.args,
+      state: "running",
+    });
+  } else if (event.type === "tool_result") {
+    h.updateTool(event.data.id, (t) => ({
+      ...t,
+      result: event.data.result,
+      state: "error" in event.data.result ? "error" : "done",
+    }));
+  } else if (event.type === "sources") {
+    h.onSources(event.data);
+  }
+}
+
 interface ChatBoxProps {
   chatId: string;
   messages: ChatMessage[];
@@ -88,6 +120,8 @@ export default function ChatBox({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useSession();
 
+  const { models, selectedId, setSelected, loading: modelsLoading } = useModels();
+
   const displayName =
     user?.user_metadata?.user_name || user?.email?.split("@")[0] || "there";
 
@@ -108,7 +142,7 @@ export default function ChatBox({
 
   const handleOpenSource = async (src: SSESource) => {
     try {
-      const { url } = await getDocumentDownloadUrl(src.source_url);
+      const { url } = await getDocumentDownloadUrl(src.source_url ?? "");
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
       toast.error("Could not open source document");
@@ -118,63 +152,109 @@ export default function ChatBox({
   const handleSend = async () => {
     const q = input.trim();
     if (!q || streaming) return;
+    if (!selectedId) {
+      toast.error("Pick a model first");
+      return;
+    }
 
     setInput("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: q,
     };
+    const assistantId = crypto.randomUUID();
     const assistantMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: assistantId,
       role: "assistant",
       content: "",
+      parts: [],
+      model: selectedId,
     };
     onMessagesChange((prev) => [...prev, userMsg, assistantMsg]);
+
+    const turn = [
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      { role: "user" as const, content: q },
+    ];
+
     const controller = new AbortController();
     abortRef.current = controller;
     setStreaming(true);
     scrollToBottom();
 
+    const updateAssistant = (mut: (m: ChatMessage) => ChatMessage) => {
+      onMessagesChange((prev) =>
+        prev.map((m) => (m.id === assistantId ? mut(m) : m)),
+      );
+    };
+
+    const appendText = (text: string) => {
+      updateAssistant((m) => {
+        const parts: MessagePart[] = m.parts ? [...m.parts] : [];
+        const last = parts[parts.length - 1];
+        if (last && last.type === "text") {
+          parts[parts.length - 1] = {
+            type: "text",
+            text: last.text + text,
+          };
+        } else {
+          parts.push({ type: "text", text });
+        }
+        const content = parts
+          .filter((p): p is { type: "text"; text: string } => p.type === "text")
+          .map((p) => p.text)
+          .join("");
+        return { ...m, parts, content };
+      });
+    };
+
+    const pushTool = (tool: ToolCallState) => {
+      updateAssistant((m) => {
+        const parts: MessagePart[] = m.parts ? [...m.parts] : [];
+        parts.push({ type: "tool", tool });
+        return { ...m, parts };
+      });
+    };
+
+    const updateTool = (id: string, mut: (t: ToolCallState) => ToolCallState) => {
+      updateAssistant((m) => {
+        const parts = (m.parts ?? []).map((p) =>
+          p.type === "tool" && p.tool.id === id
+            ? { type: "tool" as const, tool: mut(p.tool) }
+            : p,
+        );
+        return { ...m, parts };
+      });
+    };
+
     try {
-      for await (const event of streamQuery(
-        q,
-        5,
+      for await (const event of chatStream(
+        turn,
+        selectedId,
         docIds.length > 0 ? docIds : undefined,
         controller.signal,
       )) {
-        onMessagesChange((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantMsg.id) return m;
-            if (event.type === "token")
-              return { ...m, content: m.content + event.data };
-            if (event.type === "sources") {
-              sourcesRef.current.set(m.id, event.data);
-              return { ...m, sources: event.data };
-            }
-            if (event.type === "confidence")
-              return { ...m, confidence: event.data };
-            return m;
-          }),
-        );
+        handleStreamEvent(event, {
+          appendText,
+          pushTool,
+          updateTool,
+          onSources: (sources) => {
+            sourcesRef.current.set(assistantId, sources);
+            updateAssistant((m) => ({ ...m, sources }));
+          },
+        });
         scrollToBottom();
       }
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        onMessagesChange((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: m.content + " [stopped]" }
-              : m,
-          ),
-        );
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        appendText(" [stopped]");
       } else {
-        toast.error(err.message || "Query failed");
-        onMessagesChange((prev) => prev.filter((m) => m.id !== assistantMsg.id));
+        const msg = err instanceof Error ? err.message : "Chat failed";
+        toast.error(msg);
+        onMessagesChange((prev) => prev.filter((m) => m.id !== assistantId));
       }
     } finally {
       setStreaming(false);
@@ -320,15 +400,33 @@ export default function ChatBox({
                       ✈️
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
-                        {msg.content
-                          ? renderContext(msg.content, msg.sources)
-                          : streaming && <ThinkingBubble />}
-                      </div>
-                      {typeof msg.confidence === "number" && (
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Confidence: {Math.round(msg.confidence * 100)}%
-                        </p>
+                      {msg.parts && msg.parts.length > 0 ? (
+                        <div className="space-y-1">
+                          {msg.parts.map((part, idx) =>
+                            part.type === "text" ? (
+                              <div
+                                key={idx}
+                                className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed"
+                              >
+                                {renderContext(part.text, msg.sources)}
+                              </div>
+                            ) : (
+                              <ToolCallBubble key={part.tool.id} tool={part.tool} />
+                            ),
+                          )}
+                          {streaming &&
+                            msg.id === messages[messages.length - 1]?.id &&
+                            (msg.parts.length === 0 ||
+                              msg.parts[msg.parts.length - 1].type !== "text" ||
+                              (msg.parts[msg.parts.length - 1] as { type: "text"; text: string })
+                                .text === "") && <ThinkingBubble />}
+                        </div>
+                      ) : msg.content ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                          {renderContext(msg.content, msg.sources)}
+                        </div>
+                      ) : (
+                        streaming && <ThinkingBubble />
                       )}
                       {msg.content && !streaming && (
                         <div className="mt-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -378,7 +476,7 @@ export default function ChatBox({
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium truncate">
-                    {src.document_filename}
+                    {src.document_filename ?? src.filename ?? "unknown"}
                   </p>
                   <Button
                     variant="ghost"
@@ -474,18 +572,26 @@ export default function ChatBox({
               style={{ minHeight: "24px", maxHeight: "200px" }}
             />
             <div className="flex items-center justify-between px-3 pb-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                onClick={toggleDocPicker}
-                aria-label="Attach documents"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {docIds.length > 0
-                  ? `${docIds.length} doc${docIds.length > 1 ? "s" : ""}`
-                  : "Add docs"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                  onClick={toggleDocPicker}
+                  aria-label="Attach documents"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {docIds.length > 0
+                    ? `${docIds.length} doc${docIds.length > 1 ? "s" : ""}`
+                    : "Add docs"}
+                </Button>
+                <ModelPicker
+                  models={models}
+                  selectedId={selectedId}
+                  onChange={setSelected}
+                  disabled={streaming || modelsLoading}
+                />
+              </div>
               {streaming ? (
                 <Button
                   onClick={handleCancel}
