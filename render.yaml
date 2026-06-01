@@ -5,6 +5,7 @@ services:
     runtime: docker
     rootDir: backend
 
+    autoDeployTrigger: checksPass
     healthCheckPath: /health
     envVars:
       - key: ENV
