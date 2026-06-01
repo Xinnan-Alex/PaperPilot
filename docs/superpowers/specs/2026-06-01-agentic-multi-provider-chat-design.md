@@ -19,7 +19,7 @@ PaperPilot continues using the project's own provider API keys — not BYOK. Mod
 
 ## 2. Non-goals
 
-- BYOK (bring-your-own-key) from end users.
+- All provider API keys are PaperPilot-owned, configured server-side via env vars. End users never supply keys.
 - Cost tracking, token accounting, or usage dashboards.
 - Auto-routing or model-fallback chains.
 - Streaming provider-specific reasoning blocks (o1, DeepSeek-R1 thinking).
