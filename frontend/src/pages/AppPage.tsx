@@ -29,7 +29,7 @@ export default function AppPage() {
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <ChatBox key={chatKey} onNewChat={handleNewChat} />
+          <ChatBox key={chatKey} />
         </div>
       </main>
     </div>

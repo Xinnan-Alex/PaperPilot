@@ -42,11 +42,7 @@ function CitationMark({
   );
 }
 
-interface ChatBoxProps {
-  onNewChat?: () => void;
-}
-
-export default function ChatBox({ onNewChat }: ChatBoxProps) {
+export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -58,9 +54,7 @@ export default function ChatBox({ onNewChat }: ChatBoxProps) {
   const { user } = useSession();
 
   const displayName =
-    user?.user_metadata?.user_name ||
-    user?.email?.split("@")[0] ||
-    "there";
+    user?.user_metadata?.user_name || user?.email?.split("@")[0] || "there";
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -317,7 +311,9 @@ export default function ChatBox({ onNewChat }: ChatBoxProps) {
                 className="shrink-0 rounded-lg border p-3 text-xs transition-all max-w-64 bg-card"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium truncate">{src.document_filename}</p>
+                  <p className="font-medium truncate">
+                    {src.document_filename}
+                  </p>
                   <Button
                     variant="ghost"
                     size="icon"
