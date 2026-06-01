@@ -1,12 +1,26 @@
-import { Plus, FileText, PanelLeftClose, PanelLeft, FileUp, LogOut } from "lucide-react";
+import {
+  Plus,
+  FileText,
+  PanelLeftClose,
+  PanelLeft,
+  FileUp,
+  LogOut,
+  MessageSquare,
+  Trash2,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { useSession } from "@/hooks/useSession";
 import { ThemeToggle } from "./ThemeToggle";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import type { ChatSession } from "@/hooks/useChatSessions";
 
 interface SidebarProps {
+  sessions: ChatSession[];
+  activeChatId: string;
   onNewChat: () => void;
+  onSelectChat: (id: string) => void;
+  onDeleteChat: (id: string) => void;
   onToggleDocs: () => void;
   showDocs: boolean;
   collapsed: boolean;
@@ -14,7 +28,11 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
+  sessions,
+  activeChatId,
   onNewChat,
+  onSelectChat,
+  onDeleteChat,
   onToggleDocs,
   showDocs,
   collapsed,
@@ -131,8 +149,47 @@ export default function Sidebar({
         </Button>
       </nav>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Chat History */}
+      <div className="mt-3 flex-1 overflow-y-auto px-3">
+        {sessions.length > 0 && (
+          <>
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Chats
+            </p>
+            <ul className="space-y-0.5">
+              {sessions.map((session) => (
+                <li key={session.id} className="group relative">
+                  <button
+                    onClick={() => onSelectChat(session.id)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-sidebar-accent",
+                      session.id === activeChatId &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 truncate pr-5">
+                      {session.title}
+                    </span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteChat(session.id);
+                    }}
+                    aria-label="Delete chat"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
 
       {/* Footer */}
       <div className="border-t border-border p-3">

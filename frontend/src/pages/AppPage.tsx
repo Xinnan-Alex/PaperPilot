@@ -1,21 +1,41 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import ChatBox from "@/components/ChatBox";
 import UploadBox from "@/components/UploadBox";
 import Sidebar from "@/components/Sidebar";
+import { useChatSessions } from "@/hooks/useChatSessions";
 
 export default function AppPage() {
   const [showDocs, setShowDocs] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [chatKey, setChatKey] = useState(0);
+  const {
+    sessions,
+    activeChatId,
+    activeSession,
+    loading,
+    createChat,
+    selectChat,
+    deleteChat,
+    updateMessages,
+    updateDocIds,
+  } = useChatSessions();
 
-  const handleNewChat = () => {
-    setChatKey((k) => k + 1);
-  };
+  if (loading) {
+    return (
+      <div className="flex h-svh items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-svh w-full overflow-hidden bg-background">
       <Sidebar
-        onNewChat={handleNewChat}
+        sessions={sessions}
+        activeChatId={activeChatId ?? ""}
+        onNewChat={createChat}
+        onSelectChat={selectChat}
+        onDeleteChat={deleteChat}
         onToggleDocs={() => setShowDocs(!showDocs)}
         showDocs={showDocs}
         collapsed={sidebarCollapsed}
@@ -29,7 +49,18 @@ export default function AppPage() {
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <ChatBox key={chatKey} />
+          {activeSession && activeChatId && (
+            <ChatBox
+              key={activeChatId}
+              chatId={activeChatId}
+              messages={activeSession.messages}
+              docIds={activeSession.docIds}
+              onMessagesChange={(updater) =>
+                updateMessages(activeChatId, updater)
+              }
+              onDocIdsChange={(ids) => updateDocIds(activeChatId, ids)}
+            />
+          )}
         </div>
       </main>
     </div>

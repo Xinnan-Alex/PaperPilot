@@ -9,6 +9,13 @@ A RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgre
 - `supabase/migrations/` — Postgres schema migrations. Deployed by CI on push to `main`.
 - `render.yaml` — Render web service config (Docker, rootDir `backend/`).
 
+## Chat Sessions
+
+- `chat_sessions` table in Supabase stores all chat history per user (`id, user_id, title, messages jsonb, doc_ids uuid[], created_at, updated_at`).
+- Frontend hook `frontend/src/hooks/useChatSessions.ts` manages session state. Reads from Supabase on mount; writes are debounced 1.5s for messages (to avoid per-token DB writes during streaming), immediate for doc changes and deletes.
+- Each chat has its own set of attached document IDs. Users pick docs from the "Add docs" button in the chat input — no re-upload needed.
+- RLS policies on `chat_sessions` enforce user isolation.
+
 ## Backend
 
 - **Package manager:** `uv`. Lockfile is `backend/uv.lock`. Always use `uv` commands from inside `backend/`.

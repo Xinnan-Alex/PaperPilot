@@ -2,9 +2,10 @@ import {
   getDocumentDownloadUrl,
   streamQuery,
   submitFeedback,
+  listDocuments,
   type SSESource,
 } from "@/lib/api";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import {
@@ -13,15 +14,17 @@ import {
   StopCircle,
   ThumbsUp,
   ThumbsDown,
+  FileText,
+  Plus,
+  X,
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
+import type { ChatMessage } from "@/hooks/useChatSessions";
 
-interface Message {
+interface AvailableDoc {
   id: string;
-  role: "user" | "assistant";
-  content: string;
-  sources?: SSESource[];
-  confidence?: number;
+  filename: string;
+  status: string;
 }
 
 function CitationMark({
@@ -59,11 +62,26 @@ function ThinkingBubble() {
   );
 }
 
-export default function ChatBox() {
-  const [messages, setMessages] = useState<Message[]>([]);
+interface ChatBoxProps {
+  chatId: string;
+  messages: ChatMessage[];
+  docIds: string[];
+  onMessagesChange: (updater: (msgs: ChatMessage[]) => ChatMessage[]) => void;
+  onDocIdsChange: (ids: string[]) => void;
+}
+
+export default function ChatBox({
+  messages,
+  docIds,
+  onMessagesChange,
+  onDocIdsChange,
+}: ChatBoxProps) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [ratingLoading, setRatingLoading] = useState<string | null>(null);
+  const [showDocPicker, setShowDocPicker] = useState(false);
+  const [availableDocs, setAvailableDocs] = useState<AvailableDoc[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sourcesRef = useRef<Map<string, SSESource[]>>(new Map());
@@ -106,17 +124,17 @@ export default function ChatBox() {
       textareaRef.current.style.height = "auto";
     }
 
-    const userMsg: Message = {
+    const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: q,
     };
-    const assistantMsg: Message = {
+    const assistantMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
       content: "",
     };
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    onMessagesChange((prev) => [...prev, userMsg, assistantMsg]);
     const controller = new AbortController();
     abortRef.current = controller;
     setStreaming(true);
@@ -126,10 +144,10 @@ export default function ChatBox() {
       for await (const event of streamQuery(
         q,
         5,
-        undefined,
+        docIds.length > 0 ? docIds : undefined,
         controller.signal,
       )) {
-        setMessages((prev) =>
+        onMessagesChange((prev) =>
           prev.map((m) => {
             if (m.id !== assistantMsg.id) return m;
             if (event.type === "token")
@@ -147,7 +165,7 @@ export default function ChatBox() {
       }
     } catch (err: any) {
       if (err.name === "AbortError") {
-        setMessages((prev) =>
+        onMessagesChange((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
               ? { ...m, content: m.content + " [stopped]" }
@@ -156,7 +174,7 @@ export default function ChatBox() {
         );
       } else {
         toast.error(err.message || "Query failed");
-        setMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
+        onMessagesChange((prev) => prev.filter((m) => m.id !== assistantMsg.id));
       }
     } finally {
       setStreaming(false);
@@ -168,7 +186,7 @@ export default function ChatBox() {
     abortRef.current?.abort();
   };
 
-  const handleFeedback = async (msg: Message, rating: 1 | -1) => {
+  const handleFeedback = async (msg: ChatMessage, rating: 1 | -1) => {
     const sources = msg.sources || sourcesRef.current.get(msg.id) || [];
     const chunksIds = sources.map((s) => s.chunk_id);
     setRatingLoading(msg.id);
@@ -230,6 +248,35 @@ export default function ChatBox() {
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
   }, [input]);
+
+  const loadAvailableDocs = useCallback(async () => {
+    setLoadingDocs(true);
+    try {
+      const data = await listDocuments();
+      setAvailableDocs(data.filter((d) => d.status === "ready"));
+    } catch {
+      toast.error("Failed to load documents");
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, []);
+
+  const toggleDocPicker = () => {
+    if (!showDocPicker) loadAvailableDocs();
+    setShowDocPicker((v) => !v);
+  };
+
+  const toggleDoc = (id: string) => {
+    if (docIds.includes(id)) {
+      onDocIdsChange(docIds.filter((d) => d !== id));
+    } else {
+      onDocIdsChange([...docIds, id]);
+    }
+  };
+
+  const attachedDocNames = availableDocs
+    .filter((d) => docIds.includes(d.id))
+    .map((d) => d.filename);
 
   const lastAssistantMsg = [...messages]
     .reverse()
@@ -359,6 +406,61 @@ export default function ChatBox() {
       <div className="px-4 pb-6 pt-2">
         <div className="mx-auto max-w-3xl">
           <div className="rounded-2xl border bg-card shadow-sm">
+            {/* Doc Picker Dropdown */}
+            {showDocPicker && (
+              <div className="border-b px-4 py-3">
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                  Add documents to this chat
+                </p>
+                {loadingDocs ? (
+                  <p className="text-xs text-muted-foreground">Loading...</p>
+                ) : availableDocs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No ready documents. Upload via Documents panel.
+                  </p>
+                ) : (
+                  <ul className="space-y-1 max-h-48 overflow-y-auto">
+                    {availableDocs.map((doc) => (
+                      <li key={doc.id}>
+                        <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted">
+                          <input
+                            type="checkbox"
+                            checked={docIds.includes(doc.id)}
+                            onChange={() => toggleDoc(doc.id)}
+                            className="accent-foreground"
+                          />
+                          <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{doc.filename}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Attached doc chips */}
+            {docIds.length > 0 && !showDocPicker && (
+              <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+                {attachedDocNames.map((name, i) => (
+                  <span
+                    key={docIds[i]}
+                    className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
+                  >
+                    <FileText className="h-3 w-3 text-muted-foreground" />
+                    {name}
+                    <button
+                      onClick={() => toggleDoc(docIds[i])}
+                      className="ml-0.5 text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${name}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
             <textarea
               ref={textareaRef}
               value={input}
@@ -371,7 +473,19 @@ export default function ChatBox() {
               aria-label="Ask a question"
               style={{ minHeight: "24px", maxHeight: "200px" }}
             />
-            <div className="flex items-center justify-end px-3 pb-3">
+            <div className="flex items-center justify-between px-3 pb-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                onClick={toggleDocPicker}
+                aria-label="Attach documents"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {docIds.length > 0
+                  ? `${docIds.length} doc${docIds.length > 1 ? "s" : ""}`
+                  : "Add docs"}
+              </Button>
               {streaming ? (
                 <Button
                   onClick={handleCancel}

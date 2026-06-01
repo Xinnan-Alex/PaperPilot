@@ -21,6 +21,8 @@
 - **Semantic + lexical retrieval** — Hybrid search combining pgvector ANN similarity with BM25, merged via Reciprocal Rank Fusion (RRF).
 - **Streaming answers** — Real-time token-by-token responses from DeepSeek with clickable inline citations (`[1]`, `[2]`, …).
 - **Source provenance** — Every answer shows the retrieved source cards with filename, page number, and text snippet.
+- **Persistent chat history** — All conversations are stored in Supabase and synced across devices. Chat list in the sidebar; click any past chat to resume it.
+- **Per-chat document scope** — Each chat has its own set of attached documents. Pick from already-uploaded docs via the "Add docs" button — no re-uploading required.
 - **Auth & security** — GitHub OAuth via Supabase Auth; JWT verification on every API call; Row Level Security (RLS) in Postgres; per-user rate limiting.
 - **Feedback loop** — Thumbs up/down on assistant messages to collect ratings for future improvements.
 - **Dark/light mode** — Theme toggle with system preference detection.
@@ -255,7 +257,7 @@ paperpilot/
 │   ├── src/
 │   │   ├── pages/               # AppPage, Login
 │   │   ├── components/          # ChatBox, Sidebar, UploadBox, ThemeToggle
-│   │   ├── hooks/               # useSession
+│   │   ├── hooks/               # useSession, useChatSessions
 │   │   └── lib/                 # API client, Supabase init, utils
 │   ├── package.json
 │   └── vite.config.ts
@@ -279,6 +281,8 @@ paperpilot/
 | `GET` | `/documents/{id}` | Get document status |
 | `POST` | `/query` | Ask a question — returns SSE stream |
 | `POST` | `/feedback` | Submit thumbs up/down |
+
+> Chat session storage (create, list, update, delete) is handled directly by the frontend via the Supabase JS client — no backend routes needed.
 
 ---
 
