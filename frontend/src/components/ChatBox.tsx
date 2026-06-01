@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
-import { ExternalLink, Send, StopCircle, ThumbsDown } from "lucide-react";
+import { ExternalLink, Send, StopCircle, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 
 interface Message {
@@ -238,6 +238,16 @@ export default function ChatBox() {
                           className="h-7 w-7"
                           disabled={ratingLoading === msg.id}
                           onClick={() => handleFeedback(msg, 1)}
+                          aria-label="Thumbs up"
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={ratingLoading === msg.id}
+                          onClick={() => handleFeedback(msg, -1)}
                           aria-label="Thumbs down"
                         >
                           <ThumbsDown className="h-3.5 w-3.5" />
