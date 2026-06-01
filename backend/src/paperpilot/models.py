@@ -63,3 +63,16 @@ class FeedbackIn(BaseModel):
 class FeedbackOut(BaseModel):
     id: str
     created_at: datetime
+
+
+class ChatMessageIn(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    session_id: str | None = None
+    messages: list[ChatMessageIn]
+    model_id: str
+    doc_ids: list[str] | None = None
+    top_k: int = Field(default=5, ge=1, le=20)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid as _uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from pathlib import PosixPath
 from typing import Any
@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 import paperpilot.providers as _providers
+from paperpilot import agent as _agent
 from paperpilot.auth import AuthError, current_user
 from paperpilot.chunk import chunk_pages
 from paperpilot.config import settings
@@ -26,6 +27,7 @@ from paperpilot.ingest import extract_text
 from paperpilot.logging import configure_logging, generate_request_id, request_id_var
 from paperpilot.models import (
     Chunk,
+    ChatRequest,
     DocumentOut,
     FeedbackIn,
     FeedbackOut,
@@ -35,6 +37,9 @@ from paperpilot.models import (
     QueryRequest,
 )
 from paperpilot.reader import answer
+from paperpilot.tools import docs as _docs_tool
+from paperpilot.tools import search_docs as _search_docs_tool
+from paperpilot.tools import web_search as _web_search_tool
 from paperpilot.store import (
     get_document,
     insert_chunks,
@@ -44,6 +49,10 @@ from paperpilot.store import (
 )
 
 configure_logging(settings.env)
+
+_search_docs_tool.register_tool()
+_docs_tool.register_tools()
+_web_search_tool.register_tool_if_enabled()
 
 app = FastAPI(title="PaperPilot API")
 
@@ -317,6 +326,40 @@ async def query(
 ) -> StreamingResponse:
     return StreamingResponse(
         answer(body.query, user_id, top_k=body.top_k, doc_ids=body.doc_ids),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/chat")
+@limiter.limit("30/hour", key_func=get_user_key)
+async def chat(
+    request: Request,
+    body: ChatRequest,
+    user_id: str = Depends(current_user),
+) -> StreamingResponse:
+    spec = _providers.resolve(body.model_id)
+    access_token = getattr(request.state, "access_token", "") or ""
+
+    async def stream() -> AsyncIterator[str]:
+        async for session in get_db():
+            async for evt in _agent.run(
+                messages=[m.model_dump() for m in body.messages],
+                user_id=user_id,
+                model_id=spec.id,
+                doc_ids=body.doc_ids,
+                access_token=access_token,
+                db_session=session,
+                max_iterations=settings.agent_max_iterations,
+            ):
+                yield evt
+
+    return StreamingResponse(
+        stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
