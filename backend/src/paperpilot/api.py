@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging as _logging
 import time
 import uuid as _uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -55,6 +56,24 @@ _docs_tool.register_tools()
 _web_search_tool.register_tool_if_enabled()
 
 app = FastAPI(title="PaperPilot API")
+
+_log = _logging.getLogger("paperpilot.startup")
+
+
+@app.on_event("startup")
+async def _startup_provider_check() -> None:
+    enabled = [m.id for m in _providers.available_models()]
+    if not enabled:
+        _log.warning("no LLM provider API keys configured; /chat and /query will fail")
+    else:
+        _log.info("enabled LLM models: %s", ", ".join(enabled))
+    if settings.default_model_id not in enabled and enabled:
+        _log.warning(
+            "DEFAULT_MODEL_ID=%s is not in enabled models; /query will fall back to %s",
+            settings.default_model_id,
+            enabled[0],
+        )
+
 
 origins: list[str] = [o.strip() for o in settings.frontend_origins.split(",") if o.strip()]
 app.add_middleware(
