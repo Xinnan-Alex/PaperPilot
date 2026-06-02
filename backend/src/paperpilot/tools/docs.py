@@ -53,7 +53,11 @@ async def _summary_handler(args: dict[str, Any], ctx: ToolContext) -> dict[str, 
 LIST_SPEC: ToolSpec = {
     "name": "list_documents",
     "description": "List the documents the user has uploaded. Returns id, filename, and status.",
-    "parameters": {"type": "object", "properties": {}},
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
     "handler": _list_handler,
 }
 
