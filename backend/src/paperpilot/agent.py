@@ -51,7 +51,7 @@ def _build_system_prompt(doc_ids: list[str] | None) -> str:
 
 
 def _sse(event: str, data: Any) -> str:
-    payload = data if isinstance(data, str) else json.dumps(data)
+    payload = json.dumps(data)
     return f"event: {event}\ndata: {payload}\n\n"
 
 

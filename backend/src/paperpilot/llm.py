@@ -37,7 +37,11 @@ async def stream_completion(
             yield chunk
     except ValueError as exc:
         # litellm bug: MidStreamFallbackError.__init__ does int(status) where
-        # status can be a non-numeric string like 'tool_use_failed'
+        # status can be a non-numeric string like 'tool_use_failed' (Groq returns
+        # this when the model emits a malformed tool call). End the stream
+        # cleanly so the agent's empty-turn retry can recover.
+        if "tool_use_failed" in str(exc):
+            return
         raise litellm.InternalServerError(
             message=f"Stream error: {exc}",
             llm_provider="litellm",
