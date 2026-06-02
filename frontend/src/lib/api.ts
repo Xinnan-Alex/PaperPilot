@@ -126,13 +126,130 @@ export interface SSESource {
   ordinal: number;
   page: number | null;
   text: string;
-  document_filename: string;
-  source_url: string;
+  document_filename?: string;
+  filename?: string;
+  source_url?: string;
 }
 
-export interface SSEEvent {
-  type: "token" | "sources" | "confidence" | "done";
-  data: string;
+export interface ModelInfo {
+  id: string;
+  display_name: string;
+  provider: string;
+}
+
+export interface ToolCallEvent {
+  type: "tool_call";
+  data: { id: string; name: string; args: Record<string, unknown> };
+}
+
+export interface ToolResultEvent {
+  type: "tool_result";
+  data: { id: string; result: Record<string, unknown> };
+}
+
+export type StreamEvent =
+  | { type: "token"; data: string }
+  | { type: "sources"; data: SSESource[] }
+  | ToolCallEvent
+  | ToolResultEvent
+  | { type: "done" };
+
+export interface ChatTurnMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function getModels(): Promise<ModelInfo[]> {
+  return apiFetch("/models");
+}
+
+async function* parseSSEStream(
+  res: Response,
+): AsyncGenerator<StreamEvent> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentEvent = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const payload = line.slice(6);
+          if (currentEvent === "token") {
+            try {
+              yield { type: "token", data: JSON.parse(payload) as string };
+            } catch {
+              yield { type: "token", data: payload };
+            }
+          } else if (currentEvent === "sources") {
+            yield { type: "sources", data: JSON.parse(payload) as SSESource[] };
+          } else if (currentEvent === "tool_call") {
+            yield { type: "tool_call", data: JSON.parse(payload) };
+          } else if (currentEvent === "tool_result") {
+            yield { type: "tool_result", data: JSON.parse(payload) };
+          } else if (currentEvent === "done") {
+            yield { type: "done" };
+          }
+          currentEvent = "";
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function* chatStream(
+  messages: ChatTurnMessage[],
+  modelId: string,
+  docIds?: string[],
+  signal?: AbortSignal,
+): AsyncGenerator<StreamEvent> {
+  const token = await getToken();
+  if (!token) throw new Error("No access token");
+
+  const res = await fetch(`${BASE}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      messages,
+      model_id: modelId,
+      doc_ids: docIds,
+    }),
+    signal,
+  });
+
+  if (res.status === 401) {
+    signOut("Session expired.");
+    throw new Error("Unauthorized");
+  }
+  if (res.status === 429) {
+    toast.error("Chat limit reached. Try again later.");
+    throw new Error("Rate limited");
+  }
+  if (!res.ok) throw new Error(`Chat failed: ${res.status}`);
+
+  try {
+    for await (const ev of parseSSEStream(res)) yield ev;
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") return;
+    throw err;
+  }
 }
 
 export async function getDocumentDownloadUrl(

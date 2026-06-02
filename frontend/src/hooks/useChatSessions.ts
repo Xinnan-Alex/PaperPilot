@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SSESource } from "@/lib/api";
+import type { ToolCallState } from "@/components/ToolCallBubble";
 import { supabase } from "@/lib/supabase";
+
+export type MessagePart =
+  | { type: "text"; text: string }
+  | { type: "tool"; tool: ToolCallState };
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
-  content: string;
+  content: string;       // canonical text (joined from text parts on write)
+  parts?: MessagePart[]; // assistant messages
+  model?: string;
   sources?: SSESource[];
-  confidence?: number;
+  confidence?: number;   // legacy, kept for back-compat reads
 }
 
 export interface ChatSession {
@@ -28,11 +35,20 @@ interface DbRow {
   updated_at: string;
 }
 
+function migrateMessage(raw: ChatMessage): ChatMessage {
+  if (raw.role !== "assistant") return raw;
+  if (raw.parts && raw.parts.length > 0) return raw;
+  return {
+    ...raw,
+    parts: raw.content ? [{ type: "text", text: raw.content }] : [],
+  };
+}
+
 function rowToSession(row: DbRow): ChatSession {
   return {
     id: row.id,
     title: row.title,
-    messages: row.messages ?? [],
+    messages: (row.messages ?? []).map(migrateMessage),
     docIds: row.doc_ids ?? [],
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: new Date(row.updated_at).getTime(),
