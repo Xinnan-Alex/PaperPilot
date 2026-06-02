@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import ChatBox from "@/components/ChatBox";
 import UploadBox from "@/components/UploadBox";
 import Sidebar from "@/components/Sidebar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useChatSessions } from "@/hooks/useChatSessions";
 
 export default function AppPage() {
@@ -50,16 +51,18 @@ export default function AppPage() {
         )}
         <div className="flex-1 overflow-hidden">
           {activeSession && activeChatId && (
-            <ChatBox
-              key={activeChatId}
-              chatId={activeChatId}
-              messages={activeSession.messages}
-              docIds={activeSession.docIds}
-              onMessagesChange={(updater) =>
-                updateMessages(activeChatId, updater)
-              }
-              onDocIdsChange={(ids) => updateDocIds(activeChatId, ids)}
-            />
+            <ErrorBoundary key={activeChatId}>
+              <ChatBox
+                key={activeChatId}
+                chatId={activeChatId}
+                messages={activeSession.messages}
+                docIds={activeSession.docIds}
+                onMessagesChange={(updater) =>
+                  updateMessages(activeChatId, updater)
+                }
+                onDocIdsChange={(ids) => updateDocIds(activeChatId, ids)}
+              />
+            </ErrorBoundary>
           )}
         </div>
       </main>

@@ -31,5 +31,14 @@ async def stream_completion(
         kwargs["tool_choice"] = "auto"
 
     response = await litellm.acompletion(**kwargs)
-    async for chunk in response:
-        yield chunk
+    try:
+        async for chunk in response:
+            yield chunk
+    except ValueError as exc:
+        # litellm bug: MidStreamFallbackError.__init__ does int(status) where
+        # status can be a non-numeric string like 'tool_use_failed'
+        raise litellm.InternalServerError(
+            message=f"Stream error: {exc}",
+            llm_provider="litellm",
+            model=model,
+        ) from exc

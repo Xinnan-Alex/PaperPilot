@@ -1,4 +1,4 @@
-import { visit } from "unist-util-visit";
+import { visit, SKIP } from "unist-util-visit";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const remarkCitations = () => (tree: any) => {
@@ -26,6 +26,8 @@ const remarkCitations = () => (tree: any) => {
       });
 
     parent.children.splice(index, 1, ...(newNodes as never[]));
+    // Skip past the inserted nodes so visit doesn't revisit them
+    return [SKIP, index + newNodes.length];
   });
 };
 
