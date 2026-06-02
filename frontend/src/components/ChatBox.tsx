@@ -22,6 +22,7 @@ import {
   FileText,
   Plus,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import MarkdownContent from "./MarkdownContent";
@@ -95,6 +96,7 @@ export default function ChatBox({
   const [streaming, setStreaming] = useState(false);
   const [ratingLoading, setRatingLoading] = useState<string | null>(null);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
   const [availableDocs, setAvailableDocs] = useState<AvailableDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -426,39 +428,49 @@ export default function ChatBox({
 
       {/* Sources Panel */}
       {showSource && (
-        <div className="border-t px-6 py-3">
-          <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Sources
-          </p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {lastAssistantMsg?.sources?.map((src) => (
-              <div
-                key={src.chunk_id}
-                id={`source-${src.chunk_id}`}
-                className="shrink-0 rounded-lg border p-3 text-xs transition-all max-w-64 bg-card"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium truncate">
-                    {src.document_filename ?? src.filename ?? "unknown"}
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleOpenSource(src)}
-                    aria-label="Open source document"
+        <div className="px-6 py-3">
+          <div className="mx-auto max-w-3xl border-t pt-3">
+            <button
+              onClick={() => setSourcesCollapsed((v) => !v)}
+              className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronDown
+                className={`h-3 w-3 transition-transform duration-150 ${sourcesCollapsed ? "-rotate-90" : ""}`}
+              />
+              Sources ({lastAssistantMsg?.sources?.length ?? 0})
+            </button>
+            {!sourcesCollapsed && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {lastAssistantMsg?.sources?.map((src) => (
+                  <div
+                    key={src.chunk_id}
+                    id={`source-${src.chunk_id}`}
+                    className="shrink-0 rounded-lg border p-3 text-xs transition-all max-w-64 bg-card"
                   >
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                </div>
-                <p className="text-muted-foreground">
-                  Page: {src.page ?? "N/A"}
-                </p>
-                <p className="mt-1 line-clamp-3 text-muted-foreground">
-                  {src.text}
-                </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium truncate">
+                        {src.document_filename ?? src.filename ?? "unknown"}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleOpenSource(src)}
+                        aria-label="Open source document"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Page: {src.page ?? "N/A"}
+                    </p>
+                    <p className="mt-1 line-clamp-3 text-muted-foreground">
+                      {src.text}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
