@@ -1,4 +1,3 @@
-import type { ComponentType } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkCitations from "@/lib/remarkCitations";
@@ -39,17 +38,19 @@ export default function MarkdownContent({
         remarkPlugins={[remarkGfm, remarkCitations]}
         components={
           {
-            "citation-marker": ({ node }: { node?: { properties?: { n?: unknown } } }) => {
-              const n = Number(node?.properties?.n);
-              if (!sources || !sources[n]) return null;
+            // hast spreads element properties as React props; n is the 0-based citation index
+            "citation-marker": ({ n }: { n?: string }) => {
+              const index = Number(n);
+              if (isNaN(index) || !sources || !sources[index]) return null;
+              const src = sources[index];
               return (
                 <CitationMark
-                  index={n}
-                  onClick={() => onCitationClick(sources[n].chunk_id)}
+                  index={index}
+                  onClick={() => onCitationClick(src.chunk_id)}
                 />
               );
             },
-          } as Record<string, ComponentType<{ node?: { properties?: { n?: unknown } } }>>
+          } as Record<string, React.ComponentType<{ n?: string }>>
         }
       >
         {text}
