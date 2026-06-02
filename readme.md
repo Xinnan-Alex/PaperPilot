@@ -53,7 +53,7 @@ graph TD
     C --> H[Embedding Provider<br/>Voyage AI]
     C --> I[Tavily<br/>Web Search optional]
 
-    subgraph Agent Loop up to 5 iterations
+    subgraph agentloop["Agent Loop (up to 5 iterations)"]
         AL[stream_completion] -->|tool_calls| AT[Tool Dispatch]
         AT -->|search_documents| AR[Hybrid RAG]
         AT -->|list_documents| AD[Document List]
@@ -63,7 +63,7 @@ graph TD
         AT -->|results| AL
     end
 
-    C --> Agent Loop up to 5 iterations
+    C --> AL
 ```
 
 ### Document Upload & Ingestion Flow
