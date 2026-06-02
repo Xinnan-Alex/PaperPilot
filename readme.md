@@ -24,7 +24,8 @@
 - **Multi-provider LLM** — Switch between OpenAI (gpt-4o, gpt-4o-mini), DeepSeek (deepseek-chat), Groq (llama-3.3-70b-versatile), and Mistral (mistral-large-latest) per message. Models only appear if their API key is set.
 - **Per-message model selection** — Pick any available model from the chat footer before each send.
 - **Inline tool activity** — Tool calls and results render as collapsible bubbles in the chat so you can see exactly what the agent did.
-- **Streaming answers** — Real-time token-by-token responses with clickable inline citations (`[1]`, `[2]`, …).
+- **Streaming answers** — Real-time token-by-token responses with clickable inline citations (`[1]`, `[2]`, …). Rendered via `streamdown`, which handles partial / unterminated markdown blocks gracefully mid-stream.
+- **Provider-agnostic formatting** — The system prompt constrains the LLM to a restricted Markdown subset (paragraphs, `**bold**`, lists, code, citations) so output looks consistent whether the answer came from DeepSeek, OpenAI, Groq, or Mistral.
 - **Source provenance** — Every answer shows retrieved source cards with filename, page number, and text snippet.
 - **Persistent chat history** — All conversations stored in Supabase, synced across devices. Chat list in the sidebar; click any past chat to resume.
 - **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed.
@@ -186,7 +187,7 @@ sequenceDiagram
 |-------|-----------|
 | **Backend** | Python 3.11, FastAPI, Uvicorn |
 | **LLM Abstraction** | LiteLLM (OpenAI, DeepSeek, Groq, Mistral) |
-| **Frontend** | React 19, Vite, TypeScript, Tailwind CSS v4, shadcn/ui |
+| **Frontend** | React 19, Vite, TypeScript, Tailwind CSS v4, shadcn/ui, `streamdown` (LLM-streaming markdown) |
 | **Database** | Supabase Postgres + `pgvector` |
 | **Auth** | Supabase Auth (GitHub OAuth) |
 | **Embeddings** | Voyage AI `voyage-3-lite` |
@@ -279,9 +280,11 @@ paperpilot/
 │   ├── src/
 │   │   ├── pages/               # AppPage, Login
 │   │   ├── components/
-│   │   │   ├── ChatBox.tsx      # Main chat UI, SSE handling, parts rendering
-│   │   │   ├── ModelPicker.tsx  # Provider-badged model selector
-│   │   │   ├── ToolCallBubble.tsx # Inline tool activity display
+│   │   │   ├── ChatBox.tsx          # Main chat UI, SSE handling, parts rendering
+│   │   │   ├── MarkdownContent.tsx  # Streamdown wrapper + citation buttons
+│   │   │   ├── ErrorBoundary.tsx    # Per-chat boundary so one bad message can't kill the session
+│   │   │   ├── ModelPicker.tsx      # Provider-badged model selector
+│   │   │   ├── ToolCallBubble.tsx   # Inline tool activity display
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── UploadBox.tsx
 │   │   │   └── ThemeToggle.tsx
@@ -289,7 +292,7 @@ paperpilot/
 │   │   │   ├── useModels.ts     # Fetches /models, persists last selection
 │   │   │   ├── useChatSessions.ts
 │   │   │   └── useSession.ts
-│   │   └── lib/                 # API client, Supabase init, utils
+│   │   └── lib/                 # API client, Supabase init, remarkCitations plugin, utils
 │   ├── package.json
 │   └── vite.config.ts
 ├── supabase/

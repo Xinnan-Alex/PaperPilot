@@ -7,7 +7,7 @@ from typing import Any
 from paperpilot import providers, tools
 from paperpilot.llm import stream_completion
 
-SYSTEM_PROMPT = (
+_BASE_SYSTEM_PROMPT = (
     "You are PaperPilot, a research assistant. The user has uploaded documents; "
     "you have tools to search them, list them, summarize them, and (when enabled) "
     "search the web. "
@@ -16,8 +16,38 @@ SYSTEM_PROMPT = (
     "preamble. "
     "When you use search_documents, cite chunks in your reply with bracketed numbers "
     "like [1], [2] that match the order of returned chunks. Refuse off-topic or "
-    "unsafe requests."
+    "unsafe requests.\n\n"
+    "OUTPUT FORMAT (mandatory — do not deviate):\n"
+    "Use ONLY this restricted Markdown subset:\n"
+    "  - Paragraphs separated by a blank line.\n"
+    "  - Inline bold via **bold** for emphasis or short section labels (one paragraph each).\n"
+    "  - Unordered lists using '- item' (one item per line: hyphen, space, content).\n"
+    "  - Ordered lists using '1. item' (one item per line).\n"
+    "  - Inline code with backticks; fenced code blocks with triple backticks.\n"
+    "  - Citations as [1], [2] inline (search_documents only).\n\n"
+    "FORBIDDEN — never emit:\n"
+    "  - ATX headings (#, ##, ###, ...). Use **Bold Section Label** on its own paragraph instead.\n"
+    "  - Horizontal rules (---).\n"
+    "  - Italic (*text* or _text_).\n"
+    "  - HTML tags.\n\n"
+    "Every block element (paragraph, list, code block) MUST be separated from the next "
+    "by a blank line. Never concatenate body content onto the same line as a bold section label."
 )
+
+
+def _build_system_prompt(doc_ids: list[str] | None) -> str:
+    if doc_ids:
+        ids = ", ".join(doc_ids)
+        return (
+            _BASE_SYSTEM_PROMPT
+            + f" The user has narrowed the context to these document IDs: [{ids}]. "
+            "Only answer from those documents — do not list or summarise other documents."
+        )
+    return (
+        _BASE_SYSTEM_PROMPT
+        + " If you find many documents and cannot determine which are relevant, "
+        "suggest the user select specific documents via the document picker."
+    )
 
 
 def _sse(event: str, data: Any) -> str:
@@ -70,28 +100,33 @@ async def run(
     else:
         allowed_set = set(allowed_tools)
         tool_defs = [t for t in all_defs if t["function"]["name"] in allowed_set]
-    convo: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    convo: list[dict[str, Any]] = [{"role": "system", "content": _build_system_prompt(doc_ids)}, *messages]
     aggregated_sources: list[dict[str, Any]] = []
 
     for _ in range(max_iterations):
         accumulated_tool_calls: list[dict[str, Any]] = []
         assistant_text = ""
 
-        async for chunk in stream_completion(
-            model=spec.litellm_id,
-            messages=convo,
-            tools=tool_defs or None,
-        ):
-            choice = chunk.choices[0] if chunk.choices else None
-            if choice is None:
-                continue
-            d = choice.delta
-            if getattr(d, "content", None):
-                assistant_text += d.content
-                yield _sse("token", d.content)
-            tcs = getattr(d, "tool_calls", None)
-            if tcs:
-                _merge_tool_call_delta(accumulated_tool_calls, tcs)
+        try:
+            async for chunk in stream_completion(
+                model=spec.litellm_id,
+                messages=convo,
+                tools=tool_defs or None,
+            ):
+                choice = chunk.choices[0] if chunk.choices else None
+                if choice is None:
+                    continue
+                d = choice.delta
+                if getattr(d, "content", None):
+                    assistant_text += d.content
+                    yield _sse("token", d.content)
+                tcs = getattr(d, "tool_calls", None)
+                if tcs:
+                    _merge_tool_call_delta(accumulated_tool_calls, tcs)
+        except Exception as exc:
+            yield _sse("token", f"\n\n[Error: {exc}]")
+            yield _sse("done", "")
+            return
 
         if not accumulated_tool_calls:
             if aggregated_sources:

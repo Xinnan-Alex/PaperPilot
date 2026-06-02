@@ -1,7 +1,22 @@
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Streamdown } from "streamdown";
 import remarkCitations from "@/lib/remarkCitations";
 import type { SSESource } from "@/lib/api";
+
+function normalizeMarkdown(text: string): string {
+  return (
+    text
+      // newline before list-item dash directly following sentence text
+      // e.g. "system- CNN" → "system\n- CNN", "uses:- Item" → "uses:\n- Item"
+      .replace(/([a-z.)0-9:])- ([A-Z*])/g, "$1\n- $2")
+      // blank line before ordered-list numbers directly following sentence text
+      // e.g. "streets).2. Many" → "streets).\n\n2. Many"
+      .replace(/([a-z.)0-9])(\d+\. )/g, "$1\n\n$2")
+      // blank line between **Bold label** and word/digit content directly following
+      .replace(/(\*\*[^*\n]+\*\*)\n?([A-Z][a-z]|\d)/g, "$1\n\n$2")
+      // join "- **\nWord" → "- **Word" (LLM-emitted line break inside list-item bold opener)
+      .replace(/(^|\n)- \*\*\n(?=[A-Z])/g, "$1- **")
+  );
+}
 
 function CitationMark({
   index,
@@ -33,12 +48,13 @@ export default function MarkdownContent({
   onCitationClick,
 }: MarkdownContentProps) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkCitations]}
+    <div className="text-sm leading-relaxed">
+      <Streamdown
+        parseIncompleteMarkdown
+        remarkPlugins={[remarkCitations]}
+        allowedTags={{ "citation-marker": ["n"] }}
         components={
           {
-            // hast spreads element properties as React props; n is the 0-based citation index
             "citation-marker": ({ n }: { n?: string }) => {
               const index = Number(n);
               if (isNaN(index) || !sources || !sources[index]) return null;
@@ -53,8 +69,8 @@ export default function MarkdownContent({
           } as Record<string, React.ComponentType<{ n?: string }>>
         }
       >
-        {text}
-      </ReactMarkdown>
+        {normalizeMarkdown(text)}
+      </Streamdown>
     </div>
   );
 }

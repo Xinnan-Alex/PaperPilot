@@ -13,10 +13,12 @@ SUMMARY_CHAR_LIMIT = 4000
 
 async def _list_handler(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     rows = await list_documents(ctx.db_session, ctx.user_id)
+    allowed = set(ctx.doc_ids) if ctx.doc_ids else None
     return {
         "documents": [
             {"id": str(r["id"]), "filename": r["filename"], "status": r["status"]}
             for r in rows
+            if allowed is None or str(r["id"]) in allowed
         ]
     }
 
@@ -37,6 +39,8 @@ async def _fetch_first_chunks(
 
 async def _summary_handler(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     document_id = str(args["document_id"])
+    if ctx.doc_ids and document_id not in ctx.doc_ids:
+        return {"error": f"document {document_id} is not in the selected document scope"}
     rows = await _fetch_first_chunks(
         ctx.db_session, ctx.user_id, document_id, SUMMARY_CHUNK_LIMIT
     )

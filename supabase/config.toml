@@ -197,6 +197,12 @@ client_id = "env(SUPABASE_AUTH_GITHUB_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_GITHUB_SECRET)"
 redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
 
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
+
 # Configure passkey sign-ins.
 # [auth.passkey]
 # enabled = false
