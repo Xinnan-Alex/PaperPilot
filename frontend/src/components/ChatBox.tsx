@@ -24,29 +24,12 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
+import MarkdownContent from "./MarkdownContent";
 
 interface AvailableDoc {
   id: string;
   filename: string;
   status: string;
-}
-
-function CitationMark({
-  index,
-  onClick,
-}: {
-  index: number;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-muted px-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
-      aria-label={`Jump to source ${index + 1}`}
-    >
-      [{index + 1}]
-    </button>
-  );
 }
 
 function ThinkingBubble() {
@@ -292,28 +275,6 @@ export default function ChatBox({
     }
   };
 
-  const renderContext = (content: string, sources?: SSESource[]) => {
-    if (!sources || sources.length === 0) return content;
-
-    const parts = content.split(/(\[\d+\])/g);
-    return parts.map((part, i) => {
-      const match = part.match(/^\[(\d+)\]$/);
-      if (match) {
-        const num = parseInt(match[1]) - 1;
-        if (sources[num]) {
-          return (
-            <CitationMark
-              key={i}
-              index={num}
-              onClick={() => handleSourceClick(sources[num].chunk_id)}
-            />
-          );
-        }
-      }
-      return <span key={i}>{part}</span>;
-    });
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -404,12 +365,12 @@ export default function ChatBox({
                         <div className="space-y-1">
                           {msg.parts.map((part, idx) =>
                             part.type === "text" ? (
-                              <div
+                              <MarkdownContent
                                 key={idx}
-                                className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed"
-                              >
-                                {renderContext(part.text, msg.sources)}
-                              </div>
+                                text={part.text}
+                                sources={msg.sources}
+                                onCitationClick={handleSourceClick}
+                              />
                             ) : (
                               <ToolCallBubble key={part.tool.id} tool={part.tool} />
                             ),
@@ -422,9 +383,11 @@ export default function ChatBox({
                                 .text === "") && <ThinkingBubble />}
                         </div>
                       ) : msg.content ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
-                          {renderContext(msg.content, msg.sources)}
-                        </div>
+                        <MarkdownContent
+                          text={msg.content}
+                          sources={msg.sources}
+                          onCitationClick={handleSourceClick}
+                        />
                       ) : (
                         streaming && <ThinkingBubble />
                       )}
