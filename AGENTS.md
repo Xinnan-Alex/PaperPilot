@@ -1,6 +1,6 @@
 # PaperPilot — Agent Context
 
-A RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgres/pgvector/Auth/Storage).
+An agentic RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgres/pgvector/Auth/Storage). The assistant runs a tool-calling agent loop with multi-provider LLM support via LiteLLM.
 
 ## Repo Layout
 
@@ -9,11 +9,43 @@ A RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgre
 - `supabase/migrations/` — Postgres schema migrations. Deployed by CI on push to `main`.
 - `render.yaml` — Render web service config (Docker, rootDir `backend/`).
 
+## Agent Loop
+
+- `backend/src/paperpilot/agent.py` — Core `async run()` generator. Calls `stream_completion`, merges tool-call deltas, dispatches tools, loops up to `max_iterations` (default 5), then emits `done`.
+- `backend/src/paperpilot/llm.py` — `stream_completion()` wraps `litellm.acompletion`. Yields raw OpenAI-format chunks regardless of provider.
+- `backend/src/paperpilot/providers.py` — `ModelSpec` frozen dataclass. `MODELS` dict maps model ID → spec. `available_models()` filters by presence of `api_key_env` in environment. `resolve(model_id)` raises 404 if not available.
+- SSE events emitted by `agent.run`: `token`, `tool_call`, `tool_result`, `sources`, `done`.
+- `POST /query` is a backward-compat shim: calls `agent.run` with `allowed_tools=["search_documents"]` and `max_iterations=1`.
+
+## Tools
+
+- `backend/src/paperpilot/tools/__init__.py` — `ToolSpec` TypedDict, `ToolContext` dataclass, `REGISTRY` dict, `register()`, `openai_tools()`, `async dispatch()` (catches all exceptions, returns `{"error": ...}`).
+- `backend/src/paperpilot/tools/search_docs.py` — `search_documents`: hybrid RAG via `embed_query` + `hybrid_search`.
+- `backend/src/paperpilot/tools/docs.py` — `list_documents` and `get_document_summary` (first 5 chunks, 4000 chars).
+- `backend/src/paperpilot/tools/web_search.py` — `web_search` via Tavily API. Only registered if `TAVILY_API_KEY` is set.
+- Tools are registered at `api.py` module load time.
+
+## LLM Providers
+
+Supported models (gated by API key env var):
+
+| Model ID | Provider | Env var |
+|----------|----------|---------|
+| `deepseek-chat` | DeepSeek | `DEEPSEEK_API_KEY` |
+| `gpt-4o` | OpenAI | `OPENAI_API_KEY` |
+| `gpt-4o-mini` | OpenAI | `OPENAI_API_KEY` |
+| `llama-3.3-70b-versatile` | Groq | `GROQ_API_KEY` |
+| `mistral-large-latest` | Mistral | `MISTRAL_API_KEY` |
+
+`GET /models` returns only models whose env var is set. Add new models to `providers.py` `MODELS` dict — no other changes needed.
+
 ## Chat Sessions
 
 - `chat_sessions` table in Supabase stores all chat history per user (`id, user_id, title, messages jsonb, doc_ids uuid[], created_at, updated_at`).
-- Frontend hook `frontend/src/hooks/useChatSessions.ts` manages session state. Reads from Supabase on mount; writes are debounced 1.5s for messages (to avoid per-token DB writes during streaming), immediate for doc changes and deletes.
-- Each chat has its own set of attached document IDs. Users pick docs from the "Add docs" button in the chat input — no re-upload needed.
+- `messages` JSONB stores an array of `{role, parts, model_id?}`. Each `parts` entry is a `MessagePart` union: `{type:"text", text}` or `{type:"tool", tool:{id, name, args, state, result?}}`.
+- Legacy messages with `content: string` are migrated on read in `useChatSessions.ts` via `migrateMessage()`.
+- Frontend hook `frontend/src/hooks/useChatSessions.ts` manages session state. Writes debounced 1.5s for messages, immediate for doc changes and deletes.
+- Each chat has its own set of attached document IDs.
 - RLS policies on `chat_sessions` enforce user isolation.
 
 ## Backend
@@ -23,7 +55,7 @@ A RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgre
 - **Run CLI:** `uv run python -m paperpilot.cli` (subcommands: `ingest`, `ask`)
 - **Lint:** `ruff` (line-length 100, target py311). Run `uv run ruff check .` and `uv run ruff format .` from `backend/`.
 - **Typecheck:** `mypy` / `pyright` both configured to strict mode. Root `pyproject.toml` points pyright venv to `./backend/.venv`.
-- **Tests:** `pytest` (dev dependency). No test files exist yet.
+- **Tests:** `pytest` with `asyncio_mode = "auto"` — no need for `@pytest.mark.asyncio` on async test functions. Run `uv run pytest`.
 - **Config:** `pydantic-settings`, reads `.env` in `backend/` (see `.env.example`). Never commit `.env`.
 - **DB:** SQLAlchemy async + `asyncpg`. Engine uses `connect_args={"statement_cache_size": 0}` for pgbouncer compatibility.
 - **Vector:** pgvector extension on Supabase Postgres.
@@ -42,6 +74,8 @@ A RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgre
 - **Path alias:** `@/` maps to `./src/` in both Vite and TSConfig.
 - **TSConfig quirks:** `verbatimModuleSyntax: true` — use `import type` for type-only imports.
 - **Env vars (Vite):** `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Use `.env.local`.
+- **Key components:** `ChatBox.tsx` handles SSE parsing and parts-based rendering; `ModelPicker.tsx` shows available models with provider badges; `ToolCallBubble.tsx` renders tool activity inline.
+- **API client:** `src/lib/api.ts` exports `getModels()`, `chatStream()`, `parseSSEStream()`. `chatStream` is the primary chat function; `streamQuery` is the legacy shim.
 
 ## Database & Migrations
 
@@ -57,7 +91,8 @@ A RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase (Postgre
 
 ## Local Dev Setup
 
-1. Backend: copy `backend/.env.example` to `backend/.env`, fill in keys.
+1. Backend: copy `backend/.env.example` to `backend/.env`, fill in keys. At minimum: `SUPABASE_*`, `VOYAGE_API_KEY`, and one LLM key.
 2. Frontend: create `frontend/.env.local` with `VITE_API_URL=http://localhost:8000` and Supabase keys.
 3. Ensure your Supabase project has the `pgvector` extension enabled and migrations applied.
 4. Backend dev server (`uv run uvicorn ...`) expects to connect to the real Supabase DB URL.
+5. `GET /models` returns only models whose API key env var is set — if it returns an empty array, no LLM keys are configured.

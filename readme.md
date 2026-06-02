@@ -1,8 +1,8 @@
 # PaperPilot
 
-> Your documents, understood. Ask questions in plain English and get cited, sourced answers from your uploaded files.
+> Your documents, understood. Ask questions in plain English and get cited, sourced answers from your uploaded files — powered by an agentic loop with tool calling and multi-provider LLM support.
 
-**PaperPilot** is a production-ready **Retrieval-Augmented Generation (RAG)** application that lets users upload documents (PDF, DOCX, TXT, MD, HTML), processes them into searchable semantic chunks, and answers natural-language questions with inline citations and source provenance.
+**PaperPilot** is a production-ready **agentic RAG** application that lets users upload documents (PDF, DOCX, TXT, MD, HTML), processes them into searchable semantic chunks, and answers natural-language questions through an agent loop that calls tools, retrieves context, and streams cited answers in real time.
 
 <p align="center">
   <a href="https://paperpilot.leongxinnan.com">Live Demo</a> ·
@@ -19,12 +19,17 @@
 - **Multi-format ingestion** — Upload PDF, DOCX, TXT, MD, or HTML files up to 20 MB.
 - **OCR fallback** — Scanned PDF pages are automatically extracted with Tesseract OCR.
 - **Semantic + lexical retrieval** — Hybrid search combining pgvector ANN similarity with BM25, merged via Reciprocal Rank Fusion (RRF).
-- **Streaming answers** — Real-time token-by-token responses from DeepSeek with clickable inline citations (`[1]`, `[2]`, …).
-- **Source provenance** — Every answer shows the retrieved source cards with filename, page number, and text snippet.
-- **Persistent chat history** — All conversations are stored in Supabase and synced across devices. Chat list in the sidebar; click any past chat to resume it.
-- **Per-chat document scope** — Each chat has its own set of attached documents. Pick from already-uploaded docs via the "Add docs" button — no re-uploading required.
-- **Auth & security** — GitHub OAuth via Supabase Auth; JWT verification on every API call; Row Level Security (RLS) in Postgres; per-user rate limiting.
-- **Feedback loop** — Thumbs up/down on assistant messages to collect ratings for future improvements.
+- **Agentic tool loop** — The assistant decides which tools to call (up to 5 iterations) and synthesises a final answer from the results.
+- **Built-in tools** — `search_documents` (hybrid RAG), `list_documents`, `get_document_summary`, and optional `web_search` (Tavily).
+- **Multi-provider LLM** — Switch between OpenAI (gpt-4o, gpt-4o-mini), DeepSeek (deepseek-chat), Groq (llama-3.3-70b-versatile), and Mistral (mistral-large-latest) per message. Models only appear if their API key is set.
+- **Per-message model selection** — Pick any available model from the chat footer before each send.
+- **Inline tool activity** — Tool calls and results render as collapsible bubbles in the chat so you can see exactly what the agent did.
+- **Streaming answers** — Real-time token-by-token responses with clickable inline citations (`[1]`, `[2]`, …).
+- **Source provenance** — Every answer shows retrieved source cards with filename, page number, and text snippet.
+- **Persistent chat history** — All conversations stored in Supabase, synced across devices. Chat list in the sidebar; click any past chat to resume.
+- **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed.
+- **Auth & security** — GitHub OAuth via Supabase Auth; JWT verification on every API call; Row Level Security in Postgres; per-user rate limiting.
+- **Feedback loop** — Thumbs up/down on assistant messages.
 - **Dark/light mode** — Theme toggle with system preference detection.
 
 ---
@@ -40,22 +45,25 @@ graph TD
     C --> E[Supabase Auth<br/>JWT / JWKS]
     C --> F[Supabase Postgres<br/>pgvector]
 
-    C --> G[LLM Provider<br/>DeepSeek]
+    C --> G[LiteLLM<br/>Provider Abstraction]
+    G --> G1[OpenAI]
+    G --> G2[DeepSeek]
+    G --> G3[Groq]
+    G --> G4[Mistral]
     C --> H[Embedding Provider<br/>Voyage AI]
+    C --> I[Tavily<br/>Web Search optional]
 
-    subgraph RAG Pipeline
-        I[Extract<br/>pypdf / OCR]
-        J[Chunk<br/>Recursive Split]
-        K[Embed<br/>voyage-3-lite]
-        L[Store<br/>HNSW Index]
-        M[Retrieve<br/>Vector + BM25 + RRF]
-        N[Read<br/>deepseek-chat]
+    subgraph Agent Loop up to 5 iterations
+        AL[stream_completion] -->|tool_calls| AT[Tool Dispatch]
+        AT -->|search_documents| AR[Hybrid RAG]
+        AT -->|list_documents| AD[Document List]
+        AT -->|get_document_summary| AS[Doc Summary]
+        AT -->|web_search| AW[Tavily API]
+        AR --> AF[Supabase Postgres]
+        AT -->|results| AL
     end
 
-    C --> I
-    I --> J --> K --> L --> F
-    C --> M --> F
-    M --> N --> G
+    C --> Agent Loop up to 5 iterations
 ```
 
 ### Document Upload & Ingestion Flow
@@ -98,7 +106,7 @@ sequenceDiagram
     F-->>U: Show document as ready
 ```
 
-### Query & Answer Flow
+### Agent Chat Flow
 
 ```mermaid
 sequenceDiagram
@@ -106,28 +114,35 @@ sequenceDiagram
     participant U as User
     participant F as Frontend
     participant A as API
-    participant V as Voyage AI
-    participant DB as Postgres
-    participant D as DeepSeek
+    participant LLM as LiteLLM Provider
+    participant T as Tool Handler
+    participant DB as Postgres / Tavily
 
-    U->>F: Type question and submit
-    F->>A: POST /query SSE
+    U->>F: Type question, select model, submit
+    F->>A: POST /chat SSE
     Note right of A: Bearer JWT
-    A->>A: Verify JWT via JWKS
+    A->>A: Verify JWT, resolve model via provider registry
 
-    A->>V: Embed query text
-    V-->>A: 512-dim vector
+    loop Agent loop max 5 iterations
+        A->>LLM: stream_completion with tools
+        LLM-->>A: token stream or tool_calls
+        A-->>F: SSE event: token
+        alt Tool calls present
+            A-->>F: SSE event: tool_call
+            A->>T: dispatch tool
+            T->>DB: search / list / summarise / web search
+            DB-->>T: results
+            T-->>A: tool result
+            A-->>F: SSE event: tool_result
+            Note over A: Append tool result to conversation
+        else No tool calls
+            Note over A: Break loop, emit sources and done
+        end
+    end
 
-    A->>DB: pgvector cosine similarity
-    DB-->>A: semantic matches
-    A->>A: BM25 keyword search
-    A->>A: RRF rerank and merge
-
-    A->>D: Chat completion with context
-    D-->>A: Streaming tokens
-    A-->>F: SSE chunks
-    F->>F: Parse markdown and citations
-    F-->>U: Live answer with source cards
+    A-->>F: SSE event: sources
+    A-->>F: SSE event: done
+    F-->>U: Final answer with citations and tool bubbles
 ```
 
 ### Authentication Flow
@@ -161,7 +176,7 @@ sequenceDiagram
 3. **Embed** — Voyage AI `voyage-3-lite` (512-dim vectors).
 4. **Store** — Supabase Postgres with `pgvector` HNSW index.
 5. **Retrieve** — Cosine similarity + BM25 + RRF reranking.
-6. **Read** — DeepSeek `deepseek-chat` with a citation-enforcing system prompt.
+6. **Agent** — LiteLLM provider abstraction, tool loop (up to 5 iterations), SSE streaming.
 
 ---
 
@@ -170,11 +185,12 @@ sequenceDiagram
 | Layer | Technology |
 |-------|-----------|
 | **Backend** | Python 3.11, FastAPI, Uvicorn |
+| **LLM Abstraction** | LiteLLM (OpenAI, DeepSeek, Groq, Mistral) |
 | **Frontend** | React 19, Vite, TypeScript, Tailwind CSS v4, shadcn/ui |
 | **Database** | Supabase Postgres + `pgvector` |
 | **Auth** | Supabase Auth (GitHub OAuth) |
 | **Embeddings** | Voyage AI `voyage-3-lite` |
-| **LLM** | DeepSeek `deepseek-chat` |
+| **Web Search** | Tavily API (optional) |
 | **OCR** | Tesseract + `pdf2image` |
 | **Infra** | Vercel (frontend), Render (backend), Supabase (data/auth/storage) |
 | **CI/CD** | GitHub Actions (Supabase migrations) |
@@ -188,7 +204,7 @@ sequenceDiagram
 - Python 3.11
 - Node.js 20+ and `pnpm`
 - A [Supabase](https://supabase.com) project with **pgvector** enabled
-- API keys for [DeepSeek](https://deepseek.com) and [Voyage AI](https://voyageai.com)
+- API keys for at least one LLM provider (DeepSeek recommended) and [Voyage AI](https://voyageai.com)
 - (Optional) Tesseract OCR installed locally
 
 ### 1. Clone & env files
@@ -197,19 +213,16 @@ sequenceDiagram
 git clone https://github.com/<your-org>/paperpilot.git
 cd paperpilot
 
-# Backend
 cp backend/.env.example backend/.env
-# Frontend
-cp frontend/.env.local.example frontend/.env.local   # create from example if needed
 ```
 
-Fill in the keys in both `.env` files.
+Fill in at minimum `SUPABASE_*`, `VOYAGE_API_KEY`, and one LLM key (e.g. `DEEPSEEK_API_KEY`).
 
 ### 2. Backend
 
 ```bash
 cd backend
-uv sync                          # install dependencies
+uv sync
 uv run uvicorn paperpilot.api:app --reload
 ```
 
@@ -240,31 +253,49 @@ supabase db push
 ```
 paperpilot/
 ├── backend/
-│   ├── src/paperpilot/          # FastAPI app & RAG pipeline
-│   │   ├── api.py               # Routes, middleware, CORS
+│   ├── src/paperpilot/
+│   │   ├── api.py               # Routes, middleware, CORS, tool registration
+│   │   ├── agent.py             # Agentic loop — stream_completion + tool dispatch
+│   │   ├── providers.py         # LLM provider registry (env-gated model list)
+│   │   ├── llm.py               # LiteLLM streaming wrapper
+│   │   ├── tools/
+│   │   │   ├── __init__.py      # ToolSpec, ToolContext, REGISTRY, dispatch()
+│   │   │   ├── search_docs.py   # search_documents tool (hybrid RAG)
+│   │   │   ├── docs.py          # list_documents + get_document_summary tools
+│   │   │   └── web_search.py    # web_search tool (Tavily, optional)
 │   │   ├── auth.py              # JWT verification (Supabase JWKS)
 │   │   ├── ingest.py            # File extraction + OCR
 │   │   ├── chunk.py             # Recursive text splitting
 │   │   ├── embed.py             # Voyage AI embeddings
 │   │   ├── retrieve.py          # Hybrid search (vector + BM25 + RRF)
-│   │   ├── reader.py            # LLM prompt & SSE streaming
+│   │   ├── reader.py            # /query shim → agent.run (backward compat)
 │   │   ├── store.py             # DB operations
 │   │   └── cli.py               # Local CLI: ingest, ask
+│   ├── tests/
 │   ├── Dockerfile
 │   ├── pyproject.toml
 │   └── uv.lock
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/               # AppPage, Login
-│   │   ├── components/          # ChatBox, Sidebar, UploadBox, ThemeToggle
-│   │   ├── hooks/               # useSession, useChatSessions
+│   │   ├── components/
+│   │   │   ├── ChatBox.tsx      # Main chat UI, SSE handling, parts rendering
+│   │   │   ├── ModelPicker.tsx  # Provider-badged model selector
+│   │   │   ├── ToolCallBubble.tsx # Inline tool activity display
+│   │   │   ├── Sidebar.tsx
+│   │   │   ├── UploadBox.tsx
+│   │   │   └── ThemeToggle.tsx
+│   │   ├── hooks/
+│   │   │   ├── useModels.ts     # Fetches /models, persists last selection
+│   │   │   ├── useChatSessions.ts
+│   │   │   └── useSession.ts
 │   │   └── lib/                 # API client, Supabase init, utils
 │   ├── package.json
 │   └── vite.config.ts
 ├── supabase/
 │   └── migrations/              # Postgres schema & RLS policies
-├── render.yaml                  # Render web-service blueprint
-└── README.md
+├── render.yaml
+└── readme.md
 ```
 
 ---
@@ -275,14 +306,26 @@ paperpilot/
 |--------|------|-------------|
 | `GET` | `/health` | Health check (Render) |
 | `GET` | `/me` | Current authenticated user |
+| `GET` | `/models` | List available LLM models (env-gated) |
+| `POST` | `/chat` | Agentic chat turn — returns SSE stream |
 | `POST` | `/upload` | Upload file to Supabase Storage |
 | `POST` | `/ingest` | Trigger background ingestion |
 | `GET` | `/documents` | List user's documents |
 | `GET` | `/documents/{id}` | Get document status |
-| `POST` | `/query` | Ask a question — returns SSE stream |
+| `POST` | `/query` | Legacy RAG query — backward-compat shim for `/chat` |
 | `POST` | `/feedback` | Submit thumbs up/down |
 
-> Chat session storage (create, list, update, delete) is handled directly by the frontend via the Supabase JS client — no backend routes needed.
+> Chat session storage is handled directly by the frontend via the Supabase JS client.
+
+### SSE Event Surface (`POST /chat`)
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `token` | `string` | Streamed text token |
+| `tool_call` | `{id, name, args}` | Agent is calling a tool |
+| `tool_result` | `{id, result}` | Tool execution result |
+| `sources` | `chunk[]` | Retrieved document chunks |
+| `done` | `""` | Stream complete |
 
 ---
 
@@ -302,7 +345,7 @@ paperpilot/
 
 ### Database (Supabase)
 
-- Migrations in `supabase/migrations/` are automatically pushed to production on every merge to `main` via GitHub Actions (`.github/workflows/supabase-prod.yml`).
+- Migrations in `supabase/migrations/` are automatically pushed to production on every merge to `main` via GitHub Actions.
 - Enable the **pgvector** extension in your Supabase project.
 
 ---
@@ -311,15 +354,23 @@ paperpilot/
 
 ### Backend
 
-| Variable | Description |
-|----------|-------------|
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_JWKS_URL` | JWKS endpoint for JWT verification |
-| `SUPABASE_SECRET_KEY` | Backend secret key (bypasses RLS) |
-| `SUPABASE_DB_URL` | Postgres connection string |
-| `DEEPSEEK_API_KEY` | DeepSeek API key |
-| `VOYAGE_API_KEY` | Voyage AI API key |
-| `FRONTEND_ORIGINS` | Comma-separated CORS origins |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Supabase project URL |
+| `SUPABASE_JWKS_URL` | Yes | JWKS endpoint for JWT verification |
+| `SUPABASE_SECRET_KEY` | Yes | Backend secret key (bypasses RLS) |
+| `SUPABASE_DB_URL` | Yes | Postgres connection string |
+| `VOYAGE_API_KEY` | Yes | Voyage AI embeddings key |
+| `DEEPSEEK_API_KEY` | LLM key* | Enables `deepseek-chat` |
+| `OPENAI_API_KEY` | LLM key* | Enables `gpt-4o` and `gpt-4o-mini` |
+| `GROQ_API_KEY` | LLM key* | Enables `llama-3.3-70b-versatile` |
+| `MISTRAL_API_KEY` | LLM key* | Enables `mistral-large-latest` |
+| `TAVILY_API_KEY` | No | Enables `web_search` tool |
+| `DEFAULT_MODEL_ID` | No | Default model (e.g. `deepseek-chat`) |
+| `AGENT_MAX_ITERATIONS` | No | Max tool-call iterations (default `5`) |
+| `FRONTEND_ORIGINS` | Yes | Comma-separated CORS origins |
+
+> *At least one LLM key must be set.
 
 ### Frontend
 
@@ -336,7 +387,7 @@ paperpilot/
 | Task | Command |
 |------|---------|
 | Backend dev server | `uv run uvicorn paperpilot.api:app --reload` |
-| Backend CLI | `uv run python -m paperpilot.cli <ingest \| ask>` |
+| Backend tests | `uv run pytest` |
 | Backend lint | `uv run ruff check . && uv run ruff format .` |
 | Backend typecheck | `pyright` or `mypy` |
 | Frontend dev server | `pnpm dev` |
