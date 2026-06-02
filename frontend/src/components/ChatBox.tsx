@@ -565,6 +565,7 @@ export default function ChatBox({
                   selectedId={selectedId}
                   onChange={setSelected}
                   disabled={streaming || modelsLoading}
+                  loading={modelsLoading}
                 />
               </div>
               {streaming ? (
