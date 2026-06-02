@@ -23,6 +23,7 @@ import {
   Plus,
   X,
   ChevronDown,
+  Menu,
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import MarkdownContent from "./MarkdownContent";
@@ -82,15 +83,19 @@ interface ChatBoxProps {
   chatId: string;
   messages: ChatMessage[];
   docIds: string[];
+  chatTitle?: string;
   onMessagesChange: (updater: (msgs: ChatMessage[]) => ChatMessage[]) => void;
   onDocIdsChange: (ids: string[]) => void;
+  onOpenSidebar?: () => void;
 }
 
 export default function ChatBox({
   messages,
   docIds,
+  chatTitle,
   onMessagesChange,
   onDocIdsChange,
+  onOpenSidebar,
 }: ChatBoxProps) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -331,13 +336,29 @@ export default function ChatBox({
 
   return (
     <div className="flex h-full flex-col">
+      {/* Mobile header */}
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2 md:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onOpenSidebar}
+          aria-label="Open menu"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+        <h1 className="flex-1 truncate text-sm font-medium">
+          {chatTitle ?? "PaperPilot"}
+        </h1>
+      </div>
+
       {/* Messages Area */}
       <div
-        className={`flex-1 overflow-y-auto ${hasMessages ? "px-6 py-6" : ""}`}
+        className={`flex-1 overflow-y-auto ${hasMessages ? "px-3 py-4 sm:px-6 sm:py-6" : ""}`}
         ref={scrollRef}
       >
         {!hasMessages ? (
-          <div className="flex h-full flex-col items-center justify-center px-6">
+          <div className="flex h-full flex-col items-center justify-center px-4 sm:px-6">
             <div className="mb-6 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                 <span className="text-lg">✈️</span>
@@ -394,7 +415,7 @@ export default function ChatBox({
                         streaming && <ThinkingBubble />
                       )}
                       {msg.content && !streaming && (
-                        <div className="mt-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="mt-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -428,7 +449,7 @@ export default function ChatBox({
 
       {/* Sources Panel */}
       {showSource && (
-        <div className="px-6 py-3">
+        <div className="px-3 py-3 sm:px-6">
           <div className="mx-auto max-w-3xl border-t pt-3">
             <button
               onClick={() => setSourcesCollapsed((v) => !v)}
@@ -476,7 +497,7 @@ export default function ChatBox({
       )}
 
       {/* Input Area */}
-      <div className="px-4 pb-6 pt-2">
+      <div className="px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
         <div className="mx-auto max-w-3xl">
           <div className="rounded-2xl border bg-card shadow-sm">
             {/* Doc Picker Dropdown */}
