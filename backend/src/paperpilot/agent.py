@@ -102,16 +102,19 @@ async def run(
         tool_defs = [t for t in all_defs if t["function"]["name"] in allowed_set]
     convo: list[dict[str, Any]] = [{"role": "system", "content": _build_system_prompt(doc_ids)}, *messages]
     aggregated_sources: list[dict[str, Any]] = []
+    empty_turn_retried = False
 
     for _ in range(max_iterations):
         accumulated_tool_calls: list[dict[str, Any]] = []
         assistant_text = ""
+        tool_choice = "none" if empty_turn_retried else "auto"
 
         try:
             async for chunk in stream_completion(
                 model=spec.litellm_id,
                 messages=convo,
                 tools=tool_defs or None,
+                tool_choice=tool_choice,
             ):
                 choice = chunk.choices[0] if chunk.choices else None
                 if choice is None:
@@ -127,6 +130,26 @@ async def run(
             yield _sse("token", f"\n\n[Error: {exc}]")
             yield _sse("done", "")
             return
+
+        if not accumulated_tool_calls and not assistant_text:
+            if empty_turn_retried:
+                yield _sse(
+                    "token",
+                    "[Model returned an empty response. Try rephrasing your question.]",
+                )
+                yield _sse("done", "")
+                return
+            empty_turn_retried = True
+            convo.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Your previous turn was empty. Respond directly to the user's "
+                        "last message in plain text without calling any tool."
+                    ),
+                }
+            )
+            continue
 
         if not accumulated_tool_calls:
             if aggregated_sources:

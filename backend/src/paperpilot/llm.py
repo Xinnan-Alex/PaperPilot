@@ -12,6 +12,7 @@ async def stream_completion(
     tools: list[dict[str, Any]] | None = None,
     temperature: float = 0.3,
     max_tokens: int = 1024,
+    tool_choice: str = "auto",
 ) -> AsyncIterator[Any]:
     """Provider-agnostic streaming completion via LiteLLM.
 
@@ -28,7 +29,7 @@ async def stream_completion(
     }
     if tools:
         kwargs["tools"] = tools
-        kwargs["tool_choice"] = "auto"
+        kwargs["tool_choice"] = tool_choice
 
     response = await litellm.acompletion(**kwargs)
     try:

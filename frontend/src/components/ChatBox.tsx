@@ -166,7 +166,9 @@ export default function ChatBox({
     onMessagesChange((prev) => [...prev, userMsg, assistantMsg]);
 
     const turn = [
-      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      ...messages
+        .filter((m) => m.role === "user" || (m.content && m.content.trim()))
+        .map((m) => ({ role: m.role, content: m.content })),
       { role: "user" as const, content: q },
     ];
 
