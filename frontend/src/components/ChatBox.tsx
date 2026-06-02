@@ -334,6 +334,172 @@ export default function ChatBox({
 
   const hasMessages = messages.length > 0;
 
+  const sourcesPanel = showSource && (
+    <div className="px-3 py-3 sm:px-6">
+      <div className="mx-auto max-w-3xl border-t pt-3">
+        <button
+          onClick={() => setSourcesCollapsed((v) => !v)}
+          className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronDown
+            className={`h-3 w-3 transition-transform duration-150 ${sourcesCollapsed ? "-rotate-90" : ""}`}
+          />
+          Sources ({lastAssistantMsg?.sources?.length ?? 0})
+        </button>
+        {!sourcesCollapsed && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {lastAssistantMsg?.sources?.map((src) => (
+              <div
+                key={src.chunk_id}
+                id={`source-${src.chunk_id}`}
+                className="shrink-0 rounded-lg border p-3 text-xs transition-all max-w-64 bg-card"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium truncate">
+                    {src.document_filename ?? src.filename ?? "unknown"}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => handleOpenSource(src)}
+                    aria-label="Open source document"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                </div>
+                <p className="text-muted-foreground">
+                  Page: {src.page ?? "N/A"}
+                </p>
+                <p className="mt-1 line-clamp-3 text-muted-foreground">
+                  {src.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const inputArea = (
+    <div className="mx-auto w-full max-w-3xl">
+      <div className="rounded-2xl border bg-card shadow-sm">
+        {/* Doc Picker Dropdown */}
+        {showDocPicker && (
+          <div className="border-b px-4 py-3">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">
+              Add documents to this chat
+            </p>
+            {loadingDocs ? (
+              <p className="text-xs text-muted-foreground">Loading...</p>
+            ) : availableDocs.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No ready documents. Upload via Documents panel.
+              </p>
+            ) : (
+              <ul className="space-y-1 max-h-48 overflow-y-auto">
+                {availableDocs.map((doc) => (
+                  <li key={doc.id}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted">
+                      <input
+                        type="checkbox"
+                        checked={docIds.includes(doc.id)}
+                        onChange={() => toggleDoc(doc.id)}
+                        className="accent-foreground"
+                      />
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{doc.filename}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Attached doc chips */}
+        {docIds.length > 0 && !showDocPicker && (
+          <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+            {attachedDocNames.map((name, i) => (
+              <span
+                key={docIds[i]}
+                className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
+              >
+                <FileText className="h-3 w-3 text-muted-foreground" />
+                {name}
+                <button
+                  onClick={() => toggleDoc(docIds[i])}
+                  className="ml-0.5 text-muted-foreground hover:text-foreground"
+                  aria-label={`Remove ${name}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask a question about your documents..."
+          rows={1}
+          disabled={streaming}
+          className="w-full resize-none bg-transparent px-4 pt-4 pb-2 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
+          aria-label="Ask a question"
+          style={{ minHeight: "24px", maxHeight: "200px" }}
+        />
+        <div className="flex items-center justify-between px-3 pb-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+              onClick={toggleDocPicker}
+              aria-label="Attach documents"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {docIds.length > 0
+                ? `${docIds.length} doc${docIds.length > 1 ? "s" : ""}`
+                : "Add docs"}
+            </Button>
+            <ModelPicker
+              models={models}
+              selectedId={selectedId}
+              onChange={setSelected}
+              disabled={streaming || modelsLoading}
+              loading={modelsLoading}
+            />
+          </div>
+          {streaming ? (
+            <Button
+              onClick={handleCancel}
+              variant="destructive"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              aria-label="Stop generating"
+            >
+              <StopCircle className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              aria-label="Send"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col">
       {/* Mobile header */}
@@ -352,25 +518,27 @@ export default function ChatBox({
         </h1>
       </div>
 
-      {/* Messages Area */}
-      <div
-        className={`flex-1 overflow-y-auto ${hasMessages ? "px-3 py-4 sm:px-6 sm:py-6" : ""}`}
-        ref={scrollRef}
-      >
-        {!hasMessages ? (
-          <div className="flex h-full flex-col items-center justify-center px-4 sm:px-6">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                <span className="text-lg">✈️</span>
-              </div>
-              <h1 className="text-3xl font-normal tracking-tight">
-                Hello, {displayName}
-              </h1>
+      {!hasMessages ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto px-3 py-6 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              <span className="text-lg">✈️</span>
             </div>
+            <h1 className="text-3xl font-normal tracking-tight">
+              Hello, {displayName}
+            </h1>
           </div>
-        ) : (
-          <div className="mx-auto max-w-3xl space-y-6">
-            {messages.map((msg) => (
+          <div className="w-full">{inputArea}</div>
+        </div>
+      ) : (
+        <>
+          {/* Messages Area */}
+          <div
+            className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6"
+            ref={scrollRef}
+          >
+            <div className="mx-auto max-w-3xl space-y-6">
+              {messages.map((msg) => (
               <div key={msg.id} className="group">
                 {msg.role === "user" ? (
                   <div className="flex justify-end">
@@ -443,177 +611,12 @@ export default function ChatBox({
                 )}
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* Sources Panel */}
-      {showSource && (
-        <div className="px-3 py-3 sm:px-6">
-          <div className="mx-auto max-w-3xl border-t pt-3">
-            <button
-              onClick={() => setSourcesCollapsed((v) => !v)}
-              className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ChevronDown
-                className={`h-3 w-3 transition-transform duration-150 ${sourcesCollapsed ? "-rotate-90" : ""}`}
-              />
-              Sources ({lastAssistantMsg?.sources?.length ?? 0})
-            </button>
-            {!sourcesCollapsed && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {lastAssistantMsg?.sources?.map((src) => (
-                  <div
-                    key={src.chunk_id}
-                    id={`source-${src.chunk_id}`}
-                    className="shrink-0 rounded-lg border p-3 text-xs transition-all max-w-64 bg-card"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium truncate">
-                        {src.document_filename ?? src.filename ?? "unknown"}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleOpenSource(src)}
-                        aria-label="Open source document"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <p className="text-muted-foreground">
-                      Page: {src.page ?? "N/A"}
-                    </p>
-                    <p className="mt-1 line-clamp-3 text-muted-foreground">
-                      {src.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
-        <div className="mx-auto max-w-3xl">
-          <div className="rounded-2xl border bg-card shadow-sm">
-            {/* Doc Picker Dropdown */}
-            {showDocPicker && (
-              <div className="border-b px-4 py-3">
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                  Add documents to this chat
-                </p>
-                {loadingDocs ? (
-                  <p className="text-xs text-muted-foreground">Loading...</p>
-                ) : availableDocs.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    No ready documents. Upload via Documents panel.
-                  </p>
-                ) : (
-                  <ul className="space-y-1 max-h-48 overflow-y-auto">
-                    {availableDocs.map((doc) => (
-                      <li key={doc.id}>
-                        <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted">
-                          <input
-                            type="checkbox"
-                            checked={docIds.includes(doc.id)}
-                            onChange={() => toggleDoc(doc.id)}
-                            className="accent-foreground"
-                          />
-                          <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{doc.filename}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {/* Attached doc chips */}
-            {docIds.length > 0 && !showDocPicker && (
-              <div className="flex flex-wrap gap-1.5 px-4 pt-3">
-                {attachedDocNames.map((name, i) => (
-                  <span
-                    key={docIds[i]}
-                    className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
-                  >
-                    <FileText className="h-3 w-3 text-muted-foreground" />
-                    {name}
-                    <button
-                      onClick={() => toggleDoc(docIds[i])}
-                      className="ml-0.5 text-muted-foreground hover:text-foreground"
-                      aria-label={`Remove ${name}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask a question about your documents..."
-              rows={1}
-              disabled={streaming}
-              className="w-full resize-none bg-transparent px-4 pt-4 pb-2 text-sm outline-none placeholder:text-muted-foreground"
-              aria-label="Ask a question"
-              style={{ minHeight: "24px", maxHeight: "200px" }}
-            />
-            <div className="flex items-center justify-between px-3 pb-3">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                  onClick={toggleDocPicker}
-                  aria-label="Attach documents"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {docIds.length > 0
-                    ? `${docIds.length} doc${docIds.length > 1 ? "s" : ""}`
-                    : "Add docs"}
-                </Button>
-                <ModelPicker
-                  models={models}
-                  selectedId={selectedId}
-                  onChange={setSelected}
-                  disabled={streaming || modelsLoading}
-                  loading={modelsLoading}
-                />
-              </div>
-              {streaming ? (
-                <Button
-                  onClick={handleCancel}
-                  variant="destructive"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
-                  aria-label="Stop generating"
-                >
-                  <StopCircle className="h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
-                  aria-label="Send"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              )}
             </div>
           </div>
-        </div>
-      </div>
+          {sourcesPanel}
+          <div className="px-3 pb-4 pt-2 sm:px-4 sm:pb-6">{inputArea}</div>
+        </>
+      )}
     </div>
   );
 }
