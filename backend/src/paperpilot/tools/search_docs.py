@@ -37,9 +37,12 @@ async def _handle(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 SPEC: ToolSpec = {
     "name": "search_documents",
     "description": (
-        "Search the user's uploaded documents for passages relevant to a query. "
-        "Returns the top-k chunks with filename, page, and text. Use this whenever "
-        "you need information that is likely contained in the user's documents."
+        "USE WHEN: the user asks a question whose answer is likely inside their "
+        "uploaded documents. Performs semantic + keyword search and returns the "
+        "top-k matching passages (with filename, page, and text). "
+        "DO NOT USE for: listing what documents exist (use list_documents), "
+        "getting a whole document's overview (use get_document_summary), or "
+        "looking up information not in the user's documents (use web_search)."
     ),
     "parameters": {
         "type": "object",

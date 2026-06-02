@@ -46,9 +46,11 @@ async def _handle(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 SPEC: ToolSpec = {
     "name": "web_search",
     "description": (
-        "Search the live web for recent or general information not covered in the "
-        "user's uploaded documents. Use when the documents lack the answer or when "
-        "the user explicitly asks about current information."
+        "USE WHEN: the user asks about recent events, current information, public "
+        "facts, or anything the uploaded documents do not cover. Returns title, "
+        "URL, and snippet for each result. "
+        "DO NOT USE for: questions answerable from the user's uploaded documents "
+        "(try search_documents first)."
     ),
     "parameters": {
         "type": "object",

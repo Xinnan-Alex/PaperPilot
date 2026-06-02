@@ -52,7 +52,13 @@ async def _summary_handler(args: dict[str, Any], ctx: ToolContext) -> dict[str, 
 
 LIST_SPEC: ToolSpec = {
     "name": "list_documents",
-    "description": "List the documents the user has uploaded. Returns id, filename, and status.",
+    "description": (
+        "USE WHEN: the user asks what documents they have, what files are "
+        "available, or to see their document library. Returns id, filename, "
+        "and status for each document. Takes no arguments. "
+        "DO NOT USE for: searching inside documents (use search_documents) or "
+        "reading a specific document's content (use get_document_summary)."
+    ),
     "parameters": {
         "type": "object",
         "properties": {},
@@ -64,9 +70,11 @@ LIST_SPEC: ToolSpec = {
 SUMMARY_SPEC: ToolSpec = {
     "name": "get_document_summary",
     "description": (
-        "Get a short summary of a document by concatenating its first 5 chunks "
-        "(truncated to 4000 characters). Use when you need an overview of a "
-        "specific document without searching for a particular topic."
+        "USE WHEN: the user asks for an overview/summary of a specific document "
+        "by id, or asks 'what is this document about'. Returns the first 5 chunks "
+        "(up to 4000 chars) concatenated. "
+        "DO NOT USE for: targeted questions about a topic (use search_documents) "
+        "or when you don't already know the document id (use list_documents first)."
     ),
     "parameters": {
         "type": "object",
