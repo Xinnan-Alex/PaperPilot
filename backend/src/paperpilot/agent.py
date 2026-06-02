@@ -6,6 +6,12 @@ from typing import Any
 
 from paperpilot import providers, tools
 from paperpilot.llm import stream_completion
+from paperpilot.store import list_documents as _list_user_documents
+
+_DOC_TOOL_NAMES: frozenset[str] = frozenset(
+    {"search_documents", "list_documents", "get_document_summary"}
+)
+_RETRY_SEQUENCE: tuple[str, ...] = ("auto", "required", "none")
 
 _BASE_SYSTEM_PROMPT = (
     "You are PaperPilot, a research assistant. The user has uploaded documents; "
@@ -100,14 +106,21 @@ async def run(
     else:
         allowed_set = set(allowed_tools)
         tool_defs = [t for t in all_defs if t["function"]["name"] in allowed_set]
+
+    user_docs = await _list_user_documents(db_session, user_id)
+    has_ready_docs = any(d.get("status") == "ready" for d in user_docs)
+    if not has_ready_docs:
+        tool_defs = [t for t in tool_defs if t["function"]["name"] not in _DOC_TOOL_NAMES]
+
     convo: list[dict[str, Any]] = [{"role": "system", "content": _build_system_prompt(doc_ids)}, *messages]
     aggregated_sources: list[dict[str, Any]] = []
-    empty_turn_retried = False
+    retry_stage = 0
 
     for _ in range(max_iterations):
         accumulated_tool_calls: list[dict[str, Any]] = []
         assistant_text = ""
-        tool_choice = "none" if empty_turn_retried else "auto"
+        tool_choice = _RETRY_SEQUENCE[min(retry_stage, len(_RETRY_SEQUENCE) - 1)]
+        temperature = 0.0 if tool_defs else 0.3
 
         try:
             async for chunk in stream_completion(
@@ -115,6 +128,7 @@ async def run(
                 messages=convo,
                 tools=tool_defs or None,
                 tool_choice=tool_choice,
+                temperature=temperature,
             ):
                 choice = chunk.choices[0] if chunk.choices else None
                 if choice is None:
@@ -132,23 +146,26 @@ async def run(
             return
 
         if not accumulated_tool_calls and not assistant_text:
-            if empty_turn_retried:
+            retry_stage += 1
+            if retry_stage >= len(_RETRY_SEQUENCE):
                 yield _sse(
                     "token",
                     "[Model returned an empty response. Try rephrasing your question.]",
                 )
                 yield _sse("done", "")
                 return
-            empty_turn_retried = True
-            convo.append(
-                {
-                    "role": "system",
-                    "content": (
-                        "Your previous turn was empty. Respond directly to the user's "
-                        "last message in plain text without calling any tool."
-                    ),
-                }
-            )
+            next_choice = _RETRY_SEQUENCE[retry_stage]
+            if next_choice == "required":
+                nudge = (
+                    "Your previous turn was empty. Call exactly one tool to gather "
+                    "the information needed to answer the user's last message."
+                )
+            else:
+                nudge = (
+                    "Your previous turn was empty. Respond directly to the user's "
+                    "last message in plain text without calling any tool."
+                )
+            convo.append({"role": "system", "content": nudge})
             continue
 
         if not accumulated_tool_calls:
