@@ -1,0 +1,22 @@
+name: Keep Backend Warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          if [ -z "${{ secrets.BACKEND_URL }}" ]; then
+            echo "BACKEND_URL secret not set; skipping."
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "${{ secrets.BACKEND_URL }}/health")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            exit 1
+          fi

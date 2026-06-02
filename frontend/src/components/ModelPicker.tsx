@@ -5,6 +5,7 @@ interface ModelPickerProps {
   selectedId: string | null;
   onChange: (id: string) => void;
   disabled?: boolean;
+  loading?: boolean;
 }
 
 const PROVIDER_BADGE: Record<string, string> = {
@@ -19,7 +20,15 @@ export default function ModelPicker({
   selectedId,
   onChange,
   disabled,
+  loading,
 }: ModelPickerProps) {
+  if (loading) {
+    return (
+      <span className="text-xs text-muted-foreground" aria-live="polite">
+        Loading models…
+      </span>
+    );
+  }
   if (models.length === 0) {
     return (
       <span className="text-xs text-muted-foreground" aria-live="polite">
