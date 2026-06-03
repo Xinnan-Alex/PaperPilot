@@ -21,8 +21,8 @@
 - **Semantic + lexical retrieval** — Hybrid search combining pgvector ANN similarity with BM25, merged via Reciprocal Rank Fusion (RRF).
 - **Agentic tool loop** — The assistant decides which tools to call (up to 5 iterations) and synthesises a final answer from the results.
 - **Built-in tools** — `search_documents` (hybrid RAG), `list_documents`, `get_document_summary`, and optional `web_search` (Tavily).
-- **Multi-provider LLM** — Switch between OpenAI (gpt-4o, gpt-4o-mini), DeepSeek (deepseek-chat), Groq (llama-3.3-70b-versatile), and Mistral (mistral-large-latest) per message. Models only appear if their API key is set.
-- **Per-message model selection** — Pick any available model from the chat footer before each send.
+- **Multi-provider LLM** — Switch between OpenAI (gpt-4o, gpt-4o-mini), DeepSeek (deepseek-chat), Groq (llama-3.3-70b), and Mistral (mistral-large) per message. The provider/model registry lives in `backend/models.json` — add models, flip per-provider or per-model `enabled` flags, and mark one model as `default: true` without touching code. Models only surface if their provider is enabled, the model is enabled, and the API key env var is set.
+- **Per-message model selection** — Pick any available model from the chat footer before each send. Selection is held in a `<ModelProvider>` React context and persists across reloads via `localStorage`.
 - **Inline tool activity** — Tool calls and results render as collapsible bubbles in the chat so you can see exactly what the agent did.
 - **Streaming answers** — Real-time token-by-token responses with clickable inline citations (`[1]`, `[2]`, …). Rendered via `streamdown`, which handles partial / unterminated markdown blocks gracefully mid-stream.
 - **Provider-agnostic formatting** — The system prompt constrains the LLM to a restricted Markdown subset (paragraphs, `**bold**`, lists, code, citations) so output looks consistent whether the answer came from DeepSeek, OpenAI, Groq, or Mistral.
@@ -254,10 +254,11 @@ supabase db push
 ```
 paperpilot/
 ├── backend/
+│   ├── models.json              # Provider + model manifest (loaded at import)
 │   ├── src/paperpilot/
 │   │   ├── api.py               # Routes, middleware, CORS, tool registration
 │   │   ├── agent.py             # Agentic loop — stream_completion + tool dispatch
-│   │   ├── providers.py         # LLM provider registry (env-gated model list)
+│   │   ├── providers.py         # Loads models.json; exposes available_models/providers + resolve + default_model
 │   │   ├── llm.py               # LiteLLM streaming wrapper
 │   │   ├── tools/
 │   │   │   ├── __init__.py      # ToolSpec, ToolContext, REGISTRY, dispatch()
@@ -283,13 +284,13 @@ paperpilot/
 │   │   │   ├── ChatBox.tsx          # Main chat UI, SSE handling, parts rendering
 │   │   │   ├── MarkdownContent.tsx  # Streamdown wrapper + citation buttons
 │   │   │   ├── ErrorBoundary.tsx    # Per-chat boundary so one bad message can't kill the session
-│   │   │   ├── ModelPicker.tsx      # Provider-badged model selector
+│   │   │   ├── ModelProvider.tsx    # Context: fetches /models, persists selection, exposes grouping + badge helpers
+│   │   │   ├── ModelPicker.tsx      # Propless picker; reads ModelProvider context, renders <optgroup> per provider
 │   │   │   ├── ToolCallBubble.tsx   # Inline tool activity display
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── UploadBox.tsx
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── hooks/
-│   │   │   ├── useModels.ts     # Fetches /models, persists last selection
 │   │   │   ├── useChatSessions.ts
 │   │   │   └── useSession.ts
 │   │   └── lib/                 # API client, Supabase init, remarkCitations plugin, utils
@@ -309,7 +310,7 @@ paperpilot/
 |--------|------|-------------|
 | `GET` | `/health` | Health check (Render) |
 | `GET` | `/me` | Current authenticated user |
-| `GET` | `/models` | List available LLM models (env-gated) |
+| `GET` | `/models` | List enabled providers + models (manifest- and env-gated); includes `default_model_id` |
 | `POST` | `/chat` | Agentic chat turn — returns SSE stream |
 | `POST` | `/upload` | Upload file to Supabase Storage |
 | `POST` | `/ingest` | Trigger background ingestion |
@@ -366,10 +367,12 @@ paperpilot/
 | `VOYAGE_API_KEY` | Yes | Voyage AI embeddings key |
 | `DEEPSEEK_API_KEY` | LLM key* | Enables `deepseek-chat` |
 | `OPENAI_API_KEY` | LLM key* | Enables `gpt-4o` and `gpt-4o-mini` |
-| `GROQ_API_KEY` | LLM key* | Enables `llama-3.3-70b-versatile` |
-| `MISTRAL_API_KEY` | LLM key* | Enables `mistral-large-latest` |
+| `OPENAI_ORGANIZATION` | No | Required only if your OpenAI key is scoped to an organization (`org-…`) |
+| `OPENAI_PROJECT_ID` | No | Required only if your OpenAI key targets a specific project (`proj_…`) |
+| `GROQ_API_KEY` | LLM key* | Enables `llama-3.3-70b` |
+| `MISTRAL_API_KEY` | LLM key* | Enables `mistral-large` |
 | `TAVILY_API_KEY` | No | Enables `web_search` tool |
-| `DEFAULT_MODEL_ID` | No | Default model (e.g. `deepseek-chat`) |
+| `DEFAULT_MODEL_ID` | No | Fallback when no model in `backend/models.json` is marked `default: true` |
 | `AGENT_MAX_ITERATIONS` | No | Max tool-call iterations (default `5`) |
 | `FRONTEND_ORIGINS` | Yes | Comma-separated CORS origins |
 

@@ -13,7 +13,7 @@ An agentic RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase
 
 - `backend/src/paperpilot/agent.py` — Core `async run()` generator. Calls `stream_completion`, merges tool-call deltas, dispatches tools, loops up to `max_iterations` (default 5), then emits `done`.
 - `backend/src/paperpilot/llm.py` — `stream_completion()` wraps `litellm.acompletion`. Yields raw OpenAI-format chunks regardless of provider.
-- `backend/src/paperpilot/providers.py` — `ModelSpec` frozen dataclass. `MODELS` dict maps model ID → spec. `available_models()` filters by presence of `api_key_env` in environment. `resolve(model_id)` raises 404 if not available.
+- `backend/src/paperpilot/providers.py` — Loads `backend/models.json` at import (eager, fail-fast Pydantic validation). Exposes immutable `ProviderSpec` and `ModelSpec`. Public API: `available_models()`, `available_providers()`, `default_model()`, `resolve(model_id)` (raises 404). Availability gate is `provider.enabled && model.enabled && os.getenv(api_key_env)`.
 - SSE events emitted by `agent.run`: `token`, `tool_call`, `tool_result`, `sources`, `done`.
 - `POST /query` is a backward-compat shim: calls `agent.run` with `allowed_tools=["search_documents"]` and `max_iterations=1`.
 
@@ -27,17 +27,21 @@ An agentic RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase
 
 ## LLM Providers
 
-Supported models (gated by API key env var):
+Providers and models are declared in `backend/models.json`. Each provider entry carries `display_name`, `enabled`, `api_key_env`, a `badge` (`{label, color}`), and a nested `models` array. Each model entry carries `id`, `litellm_id`, `display_name`, `supports_tools`, `context_window`, `enabled`, and an optional `default: true` flag (at most one across the manifest).
+
+Defaults shipped in `models.json`:
 
 | Model ID | Provider | Env var |
 |----------|----------|---------|
-| `deepseek-chat` | DeepSeek | `DEEPSEEK_API_KEY` |
+| `deepseek-chat` (manifest default) | DeepSeek | `DEEPSEEK_API_KEY` |
 | `gpt-4o` | OpenAI | `OPENAI_API_KEY` |
 | `gpt-4o-mini` | OpenAI | `OPENAI_API_KEY` |
-| `llama-3.3-70b-versatile` | Groq | `GROQ_API_KEY` |
-| `mistral-large-latest` | Mistral | `MISTRAL_API_KEY` |
+| `llama-3.3-70b` | Groq | `GROQ_API_KEY` |
+| `mistral-large` | Mistral | `MISTRAL_API_KEY` |
 
-`GET /models` returns only models whose env var is set. Add new models to `providers.py` `MODELS` dict — no other changes needed.
+A model surfaces in `GET /models` only when `provider.enabled && model.enabled && os.getenv(api_key_env)`. The response shape is `{ default_model_id, providers: [{id, display_name, badge}], models: [{id, display_name, provider, supports_tools, context_window, default}] }`. To add or toggle a model, edit `backend/models.json` and restart the backend — no code change required. Malformed manifest entries fail server startup via Pydantic validation.
+
+OpenAI account scoping: if your `OPENAI_API_KEY` is bound to an organization or project, also set `OPENAI_ORGANIZATION=org-…` and/or `OPENAI_PROJECT_ID=proj_…` in `backend/.env`. The OpenAI SDK (via LiteLLM) reads them from `os.environ` directly.
 
 ## Chat Sessions
 
@@ -74,7 +78,7 @@ Supported models (gated by API key env var):
 - **Path alias:** `@/` maps to `./src/` in both Vite and TSConfig.
 - **TSConfig quirks:** `verbatimModuleSyntax: true` — use `import type` for type-only imports.
 - **Env vars (Vite):** `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Use `.env.local`.
-- **Key components:** `ChatBox.tsx` handles SSE parsing and parts-based rendering; `ModelPicker.tsx` shows available models with provider badges; `ToolCallBubble.tsx` renders tool activity inline.
+- **Key components:** `ChatBox.tsx` handles SSE parsing and parts-based rendering; `ModelProvider.tsx` is a React context mounted at the app root that fetches `/models` once, persists `selectedId` in `localStorage.paperpilot.lastModel`, and exposes `providers`, `models`, `modelsByProvider`, `selectedId`, `selectedModel`, `setSelected`, `getBadge`. `ModelPicker.tsx` is propless — it reads the context and renders an `<optgroup>` per provider plus a badge color dot for the current selection. `ToolCallBubble.tsx` renders tool activity inline.
 - **API client:** `src/lib/api.ts` exports `getModels()`, `chatStream()`, `parseSSEStream()`. `chatStream` is the primary chat function; `streamQuery` is the legacy shim.
 
 ## Database & Migrations
@@ -95,4 +99,4 @@ Supported models (gated by API key env var):
 2. Frontend: create `frontend/.env.local` with `VITE_API_URL=http://localhost:8000` and Supabase keys.
 3. Ensure your Supabase project has the `pgvector` extension enabled and migrations applied.
 4. Backend dev server (`uv run uvicorn ...`) expects to connect to the real Supabase DB URL.
-5. `GET /models` returns only models whose API key env var is set — if it returns an empty array, no LLM keys are configured.
+5. `GET /models` returns `{ default_model_id, providers, models }`, filtered by `provider.enabled && model.enabled && api_key_env present`. If both lists are empty, no LLM keys are configured (or every model is disabled in `backend/models.json`).
