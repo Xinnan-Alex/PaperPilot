@@ -84,6 +84,7 @@ interface ChatBoxProps {
   messages: ChatMessage[];
   docIds: string[];
   chatTitle?: string;
+  docsVersion?: number;
   onMessagesChange: (updater: (msgs: ChatMessage[]) => ChatMessage[]) => void;
   onDocIdsChange: (ids: string[]) => void;
   onOpenSidebar?: () => void;
@@ -93,6 +94,7 @@ export default function ChatBox({
   messages,
   docIds,
   chatTitle,
+  docsVersion,
   onMessagesChange,
   onDocIdsChange,
   onOpenSidebar,
@@ -310,6 +312,16 @@ export default function ChatBox({
       setLoadingDocs(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (docsVersion === undefined || docsVersion === 0) return;
+    if (showDocPicker) {
+      loadAvailableDocs();
+    } else {
+      // Clear stale list so next open fetches fresh
+      setAvailableDocs([]);
+    }
+  }, [docsVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleDocPicker = () => {
     if (!showDocPicker) loadAvailableDocs();

@@ -48,7 +48,7 @@ OpenAI account scoping: if your `OPENAI_API_KEY` is bound to an organization or 
 - `chat_sessions` table in Supabase stores all chat history per user (`id, user_id, title, messages jsonb, doc_ids uuid[], created_at, updated_at`).
 - `messages` JSONB stores an array of `{role, parts, model_id?}`. Each `parts` entry is a `MessagePart` union: `{type:"text", text}` or `{type:"tool", tool:{id, name, args, state, result?}}`.
 - Legacy messages with `content: string` are migrated on read in `useChatSessions.ts` via `migrateMessage()`.
-- Frontend hook `frontend/src/hooks/useChatSessions.ts` manages session state. Writes debounced 1.5s for messages, immediate for doc changes and deletes.
+- Frontend hook `frontend/src/hooks/useChatSessions.ts` manages session state. Writes debounced 1.5s for messages, immediate for doc changes and deletes. Exposes `removeDocFromAllSessions(docId)` which strips a deleted doc's ID from every session's `doc_ids` and persists immediately.
 - Each chat has its own set of attached document IDs.
 - RLS policies on `chat_sessions` enforce user isolation.
 
@@ -79,7 +79,7 @@ OpenAI account scoping: if your `OPENAI_API_KEY` is bound to an organization or 
 - **TSConfig quirks:** `verbatimModuleSyntax: true` — use `import type` for type-only imports.
 - **Env vars (Vite):** `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Use `.env.local`.
 - **Key components:** `ChatBox.tsx` handles SSE parsing and parts-based rendering; `ModelProvider.tsx` is a React context mounted at the app root that fetches `/models` once, persists `selectedId` in `localStorage.paperpilot.lastModel`, and exposes `providers`, `models`, `modelsByProvider`, `selectedId`, `selectedModel`, `setSelected`, `getBadge`. `ModelPicker.tsx` is propless — it reads the context and renders an `<optgroup>` per provider plus a badge color dot for the current selection. `ToolCallBubble.tsx` renders tool activity inline.
-- **API client:** `src/lib/api.ts` exports `getModels()`, `chatStream()`, `parseSSEStream()`. `chatStream` is the primary chat function; `streamQuery` is the legacy shim.
+- **API client:** `src/lib/api.ts` exports `getModels()`, `chatStream()`, `parseSSEStream()`, `deleteDocument()`. `chatStream` is the primary chat function; `streamQuery` is the legacy shim.
 
 ## Database & Migrations
 

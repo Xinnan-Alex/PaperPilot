@@ -29,6 +29,7 @@
 - **Source provenance** — Every answer shows retrieved source cards with filename, page number, and text snippet.
 - **Persistent chat history** — All conversations stored in Supabase, synced across devices. Chat list in the sidebar; click any past chat to resume.
 - **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed.
+- **Document deletion** — Hard-delete any uploaded document from the Documents panel. Removes the file from Storage, all text chunks, and embeddings with no recovery. Deleted docs are automatically removed from all active chat sessions.
 - **Auth & security** — GitHub OAuth via Supabase Auth; JWT verification on every API call; Row Level Security in Postgres; per-user rate limiting.
 - **Feedback loop** — Thumbs up/down on assistant messages.
 - **Dark/light mode** — Theme toggle with system preference detection.
@@ -316,6 +317,7 @@ paperpilot/
 | `POST` | `/ingest` | Trigger background ingestion |
 | `GET` | `/documents` | List user's documents |
 | `GET` | `/documents/{id}` | Get document status |
+| `DELETE` | `/documents/{id}` | Hard-delete document, all chunks, and Storage file |
 | `POST` | `/query` | Legacy RAG query — backward-compat shim for `/chat` |
 | `POST` | `/feedback` | Submit thumbs up/down |
 

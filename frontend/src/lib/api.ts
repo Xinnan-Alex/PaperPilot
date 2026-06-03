@@ -103,6 +103,25 @@ export async function listDocuments(): Promise<
   return apiFetch("/documents");
 }
 
+export async function deleteDocument(docId: string): Promise<void> {
+  const token = await getToken();
+  if (!token) throw new Error("No access token");
+
+  const res = await fetch(`${BASE}/documents/${docId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    signOut("Session expired. Please sign in again.");
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `Delete failed: ${res.status}`);
+  }
+}
+
 export async function submitFeedback(
   query: string,
   answer: string,
