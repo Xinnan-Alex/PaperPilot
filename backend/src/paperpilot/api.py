@@ -220,11 +220,32 @@ async def me(request: Request, user_id: str = Depends(current_user)) -> dict[str
 
 
 @app.get("/models")
-async def list_available_models(user_id: str = Depends(current_user)) -> list[dict[str, str]]:
-    return [
-        {"id": m.id, "display_name": m.display_name, "provider": m.provider}
-        for m in _providers.available_models()
-    ]
+async def list_available_models(
+    user_id: str = Depends(current_user),
+) -> dict[str, Any]:
+    default = _providers.default_model()
+    return {
+        "default_model_id": default.id if default else None,
+        "providers": [
+            {
+                "id": p.id,
+                "display_name": p.display_name,
+                "badge": {"label": p.badge.label, "color": p.badge.color},
+            }
+            for p in _providers.available_providers()
+        ],
+        "models": [
+            {
+                "id": m.id,
+                "display_name": m.display_name,
+                "provider": m.provider,
+                "supports_tools": m.supports_tools,
+                "context_window": m.context_window,
+                "default": m.default,
+            }
+            for m in _providers.available_models()
+        ],
+    }
 
 
 @app.post("/upload")
