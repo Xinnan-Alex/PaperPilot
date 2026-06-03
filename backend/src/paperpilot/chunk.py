@@ -12,9 +12,7 @@ def chunk_pages(pages: list[Page], size: int = 800, overlap: int = 100) -> list[
     for page in pages:
         page_chunks: list[str] = _split_text(page.text, size, overlap)
         for text in page_chunks:
-            chunks.append(
-                Chunk(ordinal=ordinal, page=page.page_num, text=text)
-            )
+            chunks.append(Chunk(ordinal=ordinal, page=page.page_num, text=text))
             ordinal += 1
 
     return chunks
@@ -25,9 +23,7 @@ def _split_text(text: str, size: int, overlap: int) -> list[str]:
     return _split_recursive(text, separators, size, overlap)
 
 
-def _split_recursive(
-    text: str, separators: list[str], size: int, overlap: int
-) -> list[str]:
+def _split_recursive(text: str, separators: list[str], size: int, overlap: int) -> list[str]:
     result: list[str] = []
     if len(text) <= size:
         if text.strip():
@@ -75,7 +71,9 @@ def _split_recursive(
         overlapped: list[str] = []
         for i, chunk_text in enumerate(final):
             if i > 0:
-                prev_end: str = final[i - 1][-overlap:] if len(final[i - 1]) >= overlap else final[i - 1]
+                prev_end: str = (
+                    final[i - 1][-overlap:] if len(final[i - 1]) >= overlap else final[i - 1]
+                )
                 chunk_text = prev_end + chunk_text
             overlapped.append(chunk_text)
         return overlapped

@@ -62,11 +62,12 @@ def _ocr_pdf_page(file_path: str, page_index: int) -> str | None:
             file_path, first_page=page_index + 1, last_page=page_index + 1, dpi=300
         )
         if not images:
+            log.warning("ocr_no_image_rendered", file_path=file_path, page=page_index + 1)
             return None
         text: str = pytesseract.image_to_string(images[0], lang=settings.ocr_language)
         return text.strip() if text.strip() else None
     except Exception:
-        log.warning("ocr_failed", file_path=file_path, page=page_index + 1)
+        log.exception("ocr_failed", file_path=file_path, page=page_index + 1)
         return None
 
 

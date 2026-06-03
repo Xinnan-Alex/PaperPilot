@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging as _logging
 import time
 import uuid as _uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -25,10 +24,10 @@ from paperpilot.config import settings
 from paperpilot.db import get_db
 from paperpilot.embed import embed_documents
 from paperpilot.ingest import extract_text
-from paperpilot.logging import configure_logging, generate_request_id, request_id_var
+from paperpilot.logging import configure_logging, generate_request_id, get_logger, request_id_var
 from paperpilot.models import (
-    Chunk,
     ChatRequest,
+    Chunk,
     DocumentOut,
     FeedbackIn,
     FeedbackOut,
@@ -38,9 +37,6 @@ from paperpilot.models import (
     QueryRequest,
 )
 from paperpilot.reader import answer
-from paperpilot.tools import docs as _docs_tool
-from paperpilot.tools import search_docs as _search_docs_tool
-from paperpilot.tools import web_search as _web_search_tool
 from paperpilot.store import (
     get_document,
     insert_chunks,
@@ -48,6 +44,9 @@ from paperpilot.store import (
     list_documents,
     update_document_status,
 )
+from paperpilot.tools import docs as _docs_tool
+from paperpilot.tools import search_docs as _search_docs_tool
+from paperpilot.tools import web_search as _web_search_tool
 
 configure_logging(settings.env)
 
@@ -57,21 +56,24 @@ _web_search_tool.register_tool_if_enabled()
 
 app = FastAPI(title="PaperPilot API")
 
-_log = _logging.getLogger("paperpilot.startup")
+_log = get_logger().bind(component="startup")
 
 
 @app.on_event("startup")
 async def _startup_provider_check() -> None:
     enabled = [m.id for m in _providers.available_models()]
     if not enabled:
-        _log.warning("no LLM provider API keys configured; /chat and /query will fail")
+        _log.error(
+            "no_llm_providers_configured",
+            message="No LLM provider API keys set; /chat and /query will fail",
+        )
     else:
-        _log.info("enabled LLM models: %s", ", ".join(enabled))
+        _log.info("llm_providers_enabled", models=enabled)
     if settings.default_model_id not in enabled and enabled:
         _log.warning(
-            "DEFAULT_MODEL_ID=%s is not in enabled models; /query will fall back to %s",
-            settings.default_model_id,
-            enabled[0],
+            "default_model_unavailable",
+            default_model_id=settings.default_model_id,
+            fallback=enabled[0],
         )
 
 
@@ -126,22 +128,72 @@ async def request_id_middleware(
     rid: str = generate_request_id()
     request_id_var.set(rid)
     start = time.perf_counter()
-    response = await call_next(request)
+    log = get_logger().bind(
+        request_id=rid,
+        method=request.method,
+        path=request.url.path,
+    )
+    try:
+        response = await call_next(request)
+    except Exception:
+        latency_ms = (time.perf_counter() - start) * 1000
+        metrics["requests_total"] += 1
+        metrics["latency_total_ms"] += latency_ms
+        metrics["errors_total"] += 1
+        log.exception("request_unhandled_exception", latency_ms=round(latency_ms, 2))
+        raise
+
     latency_ms = (time.perf_counter() - start) * 1000
     metrics["requests_total"] += 1
     metrics["latency_total_ms"] += latency_ms
     if response.status_code >= 500:
         metrics["errors_total"] += 1
+        log.error(
+            "request_server_error",
+            status=response.status_code,
+            latency_ms=round(latency_ms, 2),
+        )
+    elif response.status_code >= 400:
+        log.warning(
+            "request_client_error",
+            status=response.status_code,
+            latency_ms=round(latency_ms, 2),
+        )
+    else:
+        log.info(
+            "request_complete",
+            status=response.status_code,
+            latency_ms=round(latency_ms, 2),
+        )
     response.headers["X-Request-ID"] = rid
     return response
 
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    get_logger().warning(
+        "rate_limit_exceeded",
+        path=request.url.path,
+        client=get_remote_address(request),
+    )
     return JSONResponse(
         status_code=429,
         content={"detail": "Rate limit exceeded. Please try again later."},
         headers={"Retry-After": "3600"},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    get_logger().exception(
+        "unhandled_exception",
+        path=request.url.path,
+        method=request.method,
+        exc_type=type(exc).__name__,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
     )
 
 
@@ -210,20 +262,43 @@ async def upload_file(
         )
 
         if resp.status_code >= 400:
+            get_logger().error(
+                "storage_upload_failed",
+                user_id=user_id,
+                storage_path=storage_path,
+                status=resp.status_code,
+                body=resp.text[:500],
+            )
             raise HTTPException(status_code=502, detail=f"Storage upload failed: {resp.text}")
 
     async for session in get_db():
         doc_id: str = await insert_document(session, user_id, original_filename, storage_path)
+        get_logger().info(
+            "document_uploaded",
+            user_id=user_id,
+            doc_id=doc_id,
+            filename=original_filename,
+            size_bytes=len(contents),
+        )
         return {"doc_id": doc_id, "filename": original_filename}
 
 
 async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage_path: str) -> None:
+    log = get_logger().bind(doc_id=doc_id, user_id=user_id, filename=filename)
+    log.info("ingest_started")
+    start = time.perf_counter()
     async with httpx.AsyncClient(timeout=30) as client:
         download_resp: httpx.Response = await client.get(
             f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
             headers=supabase_admin_headers(),
         )
         if download_resp.status_code >= 400:
+            log.error(
+                "ingest_storage_download_failed",
+                storage_path=storage_path,
+                status=download_resp.status_code,
+                body=download_resp.text[:500],
+            )
             async for session in get_db():
                 await update_document_status(session, doc_id, "failed")
             return
@@ -235,9 +310,17 @@ async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage
 
     try:
         pages: list[Page] = extract_text(str(tmp_path))
+        log.info("ingest_extracted", page_count=len(pages))
+        if not pages:
+            log.warning("ingest_no_text_extracted", size_bytes=len(file_bytes))
+
         chunks: list[Chunk] = chunk_pages(pages)
+        log.info("ingest_chunked", chunk_count=len(chunks))
+
         texts: list[str] = [c.text for c in chunks]
         embedding: list[list[float]] = embed_documents(texts)
+        log.info("ingest_embedded", embedding_count=len(embedding))
+
         for chunk, emb in zip(chunks, embedding):
             chunk.embedding = emb
 
@@ -245,10 +328,20 @@ async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage
             await insert_chunks(session, user_id, doc_id, chunks)
             await update_document_status(session, doc_id, "ready")
 
+        log.info(
+            "ingest_completed",
+            chunk_count=len(chunks),
+            duration_ms=round((time.perf_counter() - start) * 1000, 2),
+        )
+
     except Exception:
+        log.exception(
+            "ingest_failed",
+            duration_ms=round((time.perf_counter() - start) * 1000, 2),
+        )
         async for session in get_db():
             await update_document_status(session, doc_id, "failed")
-            raise
+        return
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -330,6 +423,14 @@ async def get_document_download_url(
             json={"expiresIn": 300},
         )
     if resp.status_code >= 400:
+        get_logger().error(
+            "signed_url_failed",
+            user_id=user_id,
+            doc_id=doc_id,
+            storage_path=storage_path,
+            status=resp.status_code,
+            body=resp.text[:500],
+        )
         raise HTTPException(status_code=502, detail=f"Signed URL failed: {resp.text}")
 
     signed_path: str = resp.json().get("signedURL", "")
