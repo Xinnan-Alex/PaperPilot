@@ -1,73 +1,129 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import HTTPException
+from pydantic import BaseModel, ConfigDict
+
+from paperpilot.config import settings
 
 
-@dataclass(frozen=True)
-class ModelSpec:
+class Badge(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    label: str
+    color: str
+
+
+class ProviderSpec(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    display_name: str
+    enabled: bool = True
+    api_key_env: str
+    badge: Badge
+
+
+class ModelSpec(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     id: str
     litellm_id: str
     provider: str
     display_name: str
-    supports_tools: bool
+    supports_tools: bool = True
     context_window: int
     api_key_env: str
+    enabled: bool = True
+    default: bool = False
 
 
-MODELS: list[ModelSpec] = [
-    ModelSpec(
-        id="gpt-4o",
-        litellm_id="openai/gpt-4o",
-        provider="openai",
-        display_name="GPT-4o",
-        supports_tools=True,
-        context_window=128_000,
-        api_key_env="OPENAI_API_KEY",
-    ),
-    ModelSpec(
-        id="gpt-4o-mini",
-        litellm_id="openai/gpt-4o-mini",
-        provider="openai",
-        display_name="GPT-4o mini",
-        supports_tools=True,
-        context_window=128_000,
-        api_key_env="OPENAI_API_KEY",
-    ),
-    ModelSpec(
-        id="deepseek-chat",
-        litellm_id="deepseek/deepseek-chat",
-        provider="deepseek",
-        display_name="DeepSeek V3",
-        supports_tools=True,
-        context_window=64_000,
-        api_key_env="DEEPSEEK_API_KEY",
-    ),
-    ModelSpec(
-        id="llama-3.3-70b",
-        litellm_id="groq/llama-3.3-70b-versatile",
-        provider="groq",
-        display_name="Llama 3.3 70B",
-        supports_tools=True,
-        context_window=128_000,
-        api_key_env="GROQ_API_KEY",
-    ),
-    ModelSpec(
-        id="mistral-large",
-        litellm_id="mistral/mistral-large-latest",
-        provider="mistral",
-        display_name="Mistral Large",
-        supports_tools=True,
-        context_window=128_000,
-        api_key_env="MISTRAL_API_KEY",
-    ),
-]
+class _ModelManifestEntry(BaseModel):
+    id: str
+    litellm_id: str
+    display_name: str
+    supports_tools: bool = True
+    context_window: int
+    enabled: bool = True
+    default: bool = False
+
+
+class _ProviderManifestEntry(BaseModel):
+    display_name: str
+    enabled: bool = True
+    api_key_env: str
+    badge: Badge
+    models: list[_ModelManifestEntry]
+
+
+class _Manifest(BaseModel):
+    providers: dict[str, _ProviderManifestEntry]
+
+
+def _load_manifest(path: Path) -> tuple[dict[str, ProviderSpec], list[ModelSpec]]:
+    parsed = _Manifest.model_validate_json(path.read_text())
+
+    providers_map: dict[str, ProviderSpec] = {}
+    models_list: list[ModelSpec] = []
+    seen_model_ids: set[str] = set()
+
+    for pid, pcfg in parsed.providers.items():
+        providers_map[pid] = ProviderSpec(
+            id=pid,
+            display_name=pcfg.display_name,
+            enabled=pcfg.enabled,
+            api_key_env=pcfg.api_key_env,
+            badge=pcfg.badge,
+        )
+        for m in pcfg.models:
+            if m.id in seen_model_ids:
+                raise ValueError(f"Duplicate model id '{m.id}' in {path}")
+            seen_model_ids.add(m.id)
+            models_list.append(
+                ModelSpec(
+                    id=m.id,
+                    litellm_id=m.litellm_id,
+                    provider=pid,
+                    display_name=m.display_name,
+                    supports_tools=m.supports_tools,
+                    context_window=m.context_window,
+                    api_key_env=pcfg.api_key_env,
+                    enabled=m.enabled,
+                    default=m.default,
+                )
+            )
+
+    defaults = [m.id for m in models_list if m.default]
+    if len(defaults) > 1:
+        raise ValueError(
+            f"Multiple models flagged as default ({defaults}) in {path}; only one allowed"
+        )
+    return providers_map, models_list
+
+
+PROVIDERS, MODELS = _load_manifest(settings.models_manifest_path)
 
 
 def available_models() -> list[ModelSpec]:
-    return [m for m in MODELS if os.getenv(m.api_key_env)]
+    return [
+        m
+        for m in MODELS
+        if m.enabled and PROVIDERS[m.provider].enabled and os.getenv(m.api_key_env)
+    ]
+
+
+def available_providers() -> list[ProviderSpec]:
+    in_use = {m.provider for m in available_models()}
+    return [PROVIDERS[pid] for pid in PROVIDERS if pid in in_use]
+
+
+def default_model() -> ModelSpec | None:
+    for m in available_models():
+        if m.default:
+            return m
+    return None
 
 
 def resolve(model_id: str) -> ModelSpec:

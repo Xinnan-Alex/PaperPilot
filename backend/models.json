@@ -1,0 +1,61 @@
+{
+  "providers": {
+    "openai": {
+      "display_name": "OpenAI",
+      "enabled": true,
+      "api_key_env": "OPENAI_API_KEY",
+      "badge": { "label": "OpenAI", "color": "#10A37F" },
+      "models": [
+        {
+          "id": "gpt-4o",
+          "litellm_id": "openai/gpt-4o",
+          "display_name": "GPT-4o",
+          "supports_tools": true,
+          "context_window": 128000,
+          "enabled": true
+        },
+        {
+          "id": "gpt-4o-mini",
+          "litellm_id": "openai/gpt-4o-mini",
+          "display_name": "GPT-4o mini",
+          "supports_tools": true,
+          "context_window": 128000,
+          "enabled": true
+        }
+      ]
+    },
+    "deepseek": {
+      "display_name": "DeepSeek",
+      "enabled": true,
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "badge": { "label": "DeepSeek", "color": "#4D6BFE" },
+      "models": [
+        {
+          "id": "deepseek-chat",
+          "litellm_id": "deepseek/deepseek-chat",
+          "display_name": "DeepSeek V3",
+          "supports_tools": true,
+          "context_window": 64000,
+          "enabled": true,
+          "default": true
+        }
+      ]
+    },
+    "groq": {
+      "display_name": "Groq",
+      "enabled": true,
+      "api_key_env": "GROQ_API_KEY",
+      "badge": { "label": "Groq", "color": "#F55036" },
+      "models": [
+        {
+          "id": "llama-3.3-70b",
+          "litellm_id": "groq/llama-3.3-70b-versatile",
+          "display_name": "Llama 3.3 70B",
+          "supports_tools": true,
+          "context_window": 128000,
+          "enabled": true
+        }
+      ]
+    }
+  }
+}

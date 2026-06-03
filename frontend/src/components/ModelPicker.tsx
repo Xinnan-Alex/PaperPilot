@@ -1,27 +1,13 @@
-import type { ModelInfo } from "@/lib/api";
+import { useModels } from "./ModelProvider";
 
 interface ModelPickerProps {
-  models: ModelInfo[];
-  selectedId: string | null;
-  onChange: (id: string) => void;
   disabled?: boolean;
-  loading?: boolean;
 }
 
-const PROVIDER_BADGE: Record<string, string> = {
-  openai: "OpenAI",
-  deepseek: "DeepSeek",
-  groq: "Groq",
-  mistral: "Mistral",
-};
+export default function ModelPicker({ disabled }: ModelPickerProps) {
+  const { providers, modelsByProvider, selectedId, setSelected, loading, getBadge } =
+    useModels();
 
-export default function ModelPicker({
-  models,
-  selectedId,
-  onChange,
-  disabled,
-  loading,
-}: ModelPickerProps) {
   if (loading) {
     return (
       <span className="text-xs text-muted-foreground" aria-live="polite">
@@ -29,7 +15,9 @@ export default function ModelPicker({
       </span>
     );
   }
-  if (models.length === 0) {
+
+  const hasAny = providers.some((p) => (modelsByProvider[p.id]?.length ?? 0) > 0);
+  if (!hasAny) {
     return (
       <span className="text-xs text-muted-foreground" aria-live="polite">
         No models available
@@ -37,20 +25,40 @@ export default function ModelPicker({
     );
   }
 
+  const selectedProvider = providers.find((p) =>
+    modelsByProvider[p.id]?.some((m) => m.id === selectedId),
+  );
+  const selectedBadge = selectedProvider ? getBadge(selectedProvider.id) : null;
+
   return (
     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <span className="sr-only">Model</span>
+      {selectedBadge && (
+        <span
+          aria-hidden
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ backgroundColor: selectedBadge.color }}
+        />
+      )}
       <select
         value={selectedId ?? ""}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => setSelected(e.target.value)}
         disabled={disabled}
         className="rounded-md border bg-card px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
       >
-        {models.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.display_name} · {PROVIDER_BADGE[m.provider] ?? m.provider}
-          </option>
-        ))}
+        {providers.map((p) => {
+          const group = modelsByProvider[p.id] ?? [];
+          if (group.length === 0) return null;
+          return (
+            <optgroup key={p.id} label={p.display_name}>
+              {group.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name}
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
       </select>
     </label>
   );

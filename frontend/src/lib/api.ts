@@ -135,6 +135,26 @@ export interface ModelInfo {
   id: string;
   display_name: string;
   provider: string;
+  supports_tools: boolean;
+  context_window: number;
+  default: boolean;
+}
+
+export interface ProviderBadge {
+  label: string;
+  color: string;
+}
+
+export interface ProviderInfo {
+  id: string;
+  display_name: string;
+  badge: ProviderBadge;
+}
+
+export interface ModelsPayload {
+  default_model_id: string | null;
+  providers: ProviderInfo[];
+  models: ModelInfo[];
 }
 
 export interface ToolCallEvent {
@@ -159,7 +179,7 @@ export interface ChatTurnMessage {
   content: string;
 }
 
-export async function getModels(): Promise<ModelInfo[]> {
+export async function getModels(): Promise<ModelsPayload> {
   return apiFetch("/models");
 }
 

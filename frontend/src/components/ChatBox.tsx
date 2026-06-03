@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import ModelPicker from "./ModelPicker";
 import ToolCallBubble, { type ToolCallState } from "./ToolCallBubble";
-import { useModels } from "@/hooks/useModels";
+import { useModels } from "./ModelProvider";
 import type { ChatMessage, MessagePart } from "@/hooks/useChatSessions";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
@@ -110,7 +110,7 @@ export default function ChatBox({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useSession();
 
-  const { models, selectedId, setSelected, loading: modelsLoading } = useModels();
+  const { selectedId, loading: modelsLoading } = useModels();
 
   const displayName =
     user?.user_metadata?.user_name || user?.email?.split("@")[0] || "there";
@@ -468,13 +468,7 @@ export default function ChatBox({
                 ? `${docIds.length} doc${docIds.length > 1 ? "s" : ""}`
                 : "Add docs"}
             </Button>
-            <ModelPicker
-              models={models}
-              selectedId={selectedId}
-              onChange={setSelected}
-              disabled={streaming || modelsLoading}
-              loading={modelsLoading}
-            />
+            <ModelPicker disabled={streaming || modelsLoading} />
           </div>
           {streaming ? (
             <Button

@@ -1,8 +1,15 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
     env: str = "local"
+
+    # Model manifest (providers + models registry)
+    models_manifest_path: Path = _BACKEND_ROOT / "models.json"
 
     # Supabase
     supabase_url: str = ""
