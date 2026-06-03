@@ -142,6 +142,28 @@ async def list_documents(
     ]
 
 
+async def delete_document(
+    session: AsyncSession,
+    user_id: str,
+    doc_id: str,
+) -> str | None:
+    result = await session.execute(
+        text("SELECT storage_path FROM documents WHERE id = :id AND user_id = :user_id"),
+        {"id": doc_id, "user_id": user_id},
+    )
+    row = result.fetchone()
+    if not row:
+        return None
+    storage_path: str = row[0]
+    await session.execute(text("DELETE FROM chunks WHERE document_id = :id"), {"id": doc_id})
+    await session.execute(
+        text("DELETE FROM documents WHERE id = :id AND user_id = :user_id"),
+        {"id": doc_id, "user_id": user_id},
+    )
+    await session.commit()
+    return storage_path
+
+
 async def get_document(
     session: AsyncSession,
     user_id: str,

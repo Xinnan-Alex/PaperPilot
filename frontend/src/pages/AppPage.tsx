@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import ChatBox from "@/components/ChatBox";
 import UploadBox from "@/components/UploadBox";
@@ -11,6 +11,7 @@ export default function AppPage() {
   const [showDocs, setShowDocs] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [docsVersion, setDocsVersion] = useState(0);
   const {
     sessions,
     activeChatId,
@@ -21,7 +22,20 @@ export default function AppPage() {
     deleteChat,
     updateMessages,
     updateDocIds,
+    removeDocFromAllSessions,
   } = useChatSessions();
+
+  const handleDocDeleted = useCallback(
+    (docId: string) => {
+      removeDocFromAllSessions(docId);
+      setDocsVersion((v) => v + 1);
+    },
+    [removeDocFromAllSessions],
+  );
+
+  const handleDocsChanged = useCallback(() => {
+    setDocsVersion((v) => v + 1);
+  }, []);
 
   if (loading) {
     return (
@@ -75,7 +89,7 @@ export default function AppPage() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <UploadBox />
+              <UploadBox onDocDeleted={handleDocDeleted} onDocsChanged={handleDocsChanged} />
             </div>
           </>
         )}
@@ -88,6 +102,7 @@ export default function AppPage() {
                 messages={activeSession.messages}
                 docIds={activeSession.docIds}
                 chatTitle={activeSession.title}
+                docsVersion={docsVersion}
                 onMessagesChange={(updater) =>
                   updateMessages(activeChatId, updater)
                 }

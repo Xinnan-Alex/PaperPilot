@@ -38,6 +38,7 @@ from paperpilot.models import (
 )
 from paperpilot.reader import answer
 from paperpilot.store import (
+    delete_document,
     get_document,
     insert_chunks,
     insert_document,
@@ -417,6 +418,38 @@ async def get_document_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return DocumentOut(**doc)
+
+
+@app.delete("/documents/{doc_id}", status_code=204)
+async def delete_document_endpoint(
+    doc_id: str,
+    request: Request,
+    user_id: str = Depends(current_user),
+) -> Response:
+    async for session in get_db():
+        storage_path = await delete_document(session, user_id, doc_id)
+
+    if storage_path is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    encoded_path = quote(storage_path, safe="/")
+    async with httpx.AsyncClient(timeout=10) as client:
+        del_resp = await client.delete(
+            f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{encoded_path}",
+            headers=supabase_admin_headers(),
+        )
+        if del_resp.status_code >= 400:
+            get_logger().warning(
+                "storage_delete_failed",
+                user_id=user_id,
+                doc_id=doc_id,
+                storage_path=storage_path,
+                status=del_resp.status_code,
+                body=del_resp.text[:200],
+            )
+
+    get_logger().info("document_deleted", user_id=user_id, doc_id=doc_id)
+    return Response(status_code=204)
 
 
 @app.get("/documents/{doc_id}/download-url")

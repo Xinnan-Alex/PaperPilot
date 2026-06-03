@@ -1,8 +1,9 @@
-import { ingestDocument, listDocuments, uploadDocument } from "@/lib/api";
-import { CheckCircle2, FileText, Loader2, Upload, XCircle } from "lucide-react";
+import { deleteDocument, ingestDocument, listDocuments, uploadDocument } from "@/lib/api";
+import { CheckCircle2, FileText, Loader2, Trash2, Upload, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 
 interface Doc {
@@ -28,11 +29,18 @@ function validateFile(file: File): string | null {
   return `Unsupported file type. Allowed: PDF, DOCX, TXT, MD, HTML.`;
 }
 
-export default function UploadBox() {
+interface UploadBoxProps {
+  onDocDeleted?: (docId: string) => void;
+  onDocsChanged?: () => void;
+}
+
+export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProps) {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
@@ -40,13 +48,14 @@ export default function UploadBox() {
     try {
       const data = await listDocuments();
       setDocs(data);
+      onDocsChanged?.();
     } catch (err) {
       console.error("Failed to fetch documents:", err);
       toast.error("Failed to load documents");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onDocsChanged]);
 
   useEffect(() => {
     fetchDocs();
@@ -67,6 +76,21 @@ export default function UploadBox() {
       }
     };
   }, [docs, fetchDocs]);
+
+  const handleDelete = async (docId: string) => {
+    setDeleting(docId);
+    setConfirmDeleteId(null);
+    try {
+      await deleteDocument(docId);
+      toast.success("Document permanently deleted");
+      onDocDeleted?.(docId);
+      await fetchDocs();
+    } catch (err: any) {
+      toast.error(err.message || "Delete failed");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const handleFile = async (file: File) => {
     const error = validateFile(file);
@@ -160,35 +184,84 @@ export default function UploadBox() {
             No documents yet. Upload one to get started.
           </p>
         ) : (
-          <ul className="space-y-1" role="list">
-            {docs.map((doc) => (
-              <li
-                key={doc.id}
-                className="flex items-center justify-between rounded-lg border px-3 py-2 text-xs"
-              >
-                <span className="truncate pr-2">{doc.filename}</span>
-                <Badge
-                  variant={
-                    doc.status === "ready"
-                      ? "default"
-                      : doc.status === "failed"
-                        ? "destructive"
-                        : "secondary"
-                  }
-                  className="text-[10px] shrink-0"
+          <>
+            <ul className="space-y-1" role="list">
+              {docs.map((doc) => (
+                <li
+                  key={doc.id}
+                  className="rounded-lg border px-3 py-2 text-xs"
                 >
-                  {doc.status === "ready" ? (
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                  ) : doc.status === "failed" ? (
-                    <XCircle className="mr-1 h-3 w-3" />
-                  ) : (
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate flex-1">{doc.filename}</span>
+                    <Badge
+                      variant={
+                        doc.status === "ready"
+                          ? "default"
+                          : doc.status === "failed"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                      className="text-[10px] shrink-0"
+                    >
+                      {doc.status === "ready" ? (
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                      ) : doc.status === "failed" ? (
+                        <XCircle className="mr-1 h-3 w-3" />
+                      ) : (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      )}
+                      {doc.status}
+                    </Badge>
+                    {deleting === doc.id ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+                        aria-label="Delete document"
+                        onClick={() =>
+                          setConfirmDeleteId(
+                            confirmDeleteId === doc.id ? null : doc.id,
+                          )
+                        }
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  {confirmDeleteId === doc.id && (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
+                      <span className="text-[10px] text-destructive leading-tight">
+                        Permanently delete? All data removed, no recovery.
+                      </span>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-5 px-2 text-[10px]"
+                          onClick={() => handleDelete(doc.id)}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 px-2 text-[10px]"
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
                   )}
-                  {doc.status}
-                </Badge>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[10px] text-muted-foreground/60 text-center leading-tight px-1">
+              Deleted documents are permanently removed — no file, text, or embeddings are retained.
+            </p>
+          </>
         )}
       </div>
     </div>

@@ -212,6 +212,29 @@ export function useChatSessions() {
     [],
   );
 
+  const removeDocFromAllSessions = useCallback(
+    async (docId: string) => {
+      setSessions((prev) => {
+        const affected = prev.filter((s) => s.docIds.includes(docId));
+        if (affected.length === 0) return prev;
+        const next = prev.map((s) =>
+          s.docIds.includes(docId)
+            ? { ...s, docIds: s.docIds.filter((id) => id !== docId), updatedAt: Date.now() }
+            : s,
+        );
+        affected.forEach((s) => {
+          const updated = next.find((n) => n.id === s.id)!;
+          supabase
+            .from("chat_sessions")
+            .update({ doc_ids: updated.docIds, updated_at: new Date().toISOString() })
+            .eq("id", s.id);
+        });
+        return next;
+      });
+    },
+    [],
+  );
+
   return {
     sessions,
     activeChatId,
@@ -222,5 +245,6 @@ export function useChatSessions() {
     deleteChat,
     updateMessages,
     updateDocIds,
+    removeDocFromAllSessions,
   };
 }
