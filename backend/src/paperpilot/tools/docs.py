@@ -41,9 +41,7 @@ async def _summary_handler(args: dict[str, Any], ctx: ToolContext) -> dict[str, 
     document_id = str(args["document_id"])
     if ctx.doc_ids and document_id not in ctx.doc_ids:
         return {"error": f"document {document_id} is not in the selected document scope"}
-    rows = await _fetch_first_chunks(
-        ctx.db_session, ctx.user_id, document_id, SUMMARY_CHUNK_LIMIT
-    )
+    rows = await _fetch_first_chunks(ctx.db_session, ctx.user_id, document_id, SUMMARY_CHUNK_LIMIT)
     if not rows:
         return {"error": f"document {document_id} not found or has no chunks"}
     combined = "\n\n".join(r["text"] for r in rows)
@@ -78,9 +76,7 @@ SUMMARY_SPEC: ToolSpec = {
     ),
     "parameters": {
         "type": "object",
-        "properties": {
-            "document_id": {"type": "string", "description": "The document id (uuid)."}
-        },
+        "properties": {"document_id": {"type": "string", "description": "The document id (uuid)."}},
         "required": ["document_id"],
     },
     "handler": _summary_handler,

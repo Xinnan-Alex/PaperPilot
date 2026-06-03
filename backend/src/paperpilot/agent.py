@@ -6,6 +6,7 @@ from typing import Any
 
 from paperpilot import providers, tools
 from paperpilot.llm import stream_completion
+from paperpilot.logging import get_logger
 from paperpilot.store import list_documents as _list_user_documents
 
 _DOC_TOOL_NAMES: frozenset[str] = frozenset(
@@ -94,6 +95,7 @@ async def run(
     allowed_tools: list[str] | None = None,
 ) -> AsyncIterator[str]:
     spec = providers.resolve(model_id)
+    log = get_logger().bind(user_id=user_id, model_id=spec.id, doc_ids=doc_ids)
     ctx = tools.ToolContext(
         user_id=user_id,
         access_token=access_token,
@@ -112,11 +114,15 @@ async def run(
     if not has_ready_docs:
         tool_defs = [t for t in tool_defs if t["function"]["name"] not in _DOC_TOOL_NAMES]
 
-    convo: list[dict[str, Any]] = [{"role": "system", "content": _build_system_prompt(doc_ids)}, *messages]
+    convo: list[dict[str, Any]] = [
+        {"role": "system", "content": _build_system_prompt(doc_ids)},
+        *messages,
+    ]
     aggregated_sources: list[dict[str, Any]] = []
     retry_stage = 0
+    log.info("agent_run_start", tools=[t["function"]["name"] for t in tool_defs])
 
-    for _ in range(max_iterations):
+    for iteration in range(max_iterations):
         accumulated_tool_calls: list[dict[str, Any]] = []
         assistant_text = ""
         tool_choice = _RETRY_SEQUENCE[min(retry_stage, len(_RETRY_SEQUENCE) - 1)]
@@ -141,6 +147,11 @@ async def run(
                 if tcs:
                     _merge_tool_call_delta(accumulated_tool_calls, tcs)
         except Exception as exc:
+            log.exception(
+                "agent_stream_failed",
+                iteration=iteration,
+                exc_type=type(exc).__name__,
+            )
             yield _sse("token", f"\n\n[Error: {exc}]")
             yield _sse("done", "")
             return
@@ -148,6 +159,11 @@ async def run(
         if not accumulated_tool_calls and not assistant_text:
             retry_stage += 1
             if retry_stage >= len(_RETRY_SEQUENCE):
+                log.warning(
+                    "agent_empty_response_exhausted",
+                    iteration=iteration,
+                    retries=retry_stage,
+                )
                 yield _sse(
                     "token",
                     "[Model returned an empty response. Try rephrasing your question.]",
@@ -155,6 +171,11 @@ async def run(
                 yield _sse("done", "")
                 return
             next_choice = _RETRY_SEQUENCE[retry_stage]
+            log.warning(
+                "agent_empty_response_retry",
+                iteration=iteration,
+                next_tool_choice=next_choice,
+            )
             if next_choice == "required":
                 nudge = (
                     "Your previous turn was empty. Call exactly one tool to gather "
@@ -169,6 +190,11 @@ async def run(
             continue
 
         if not accumulated_tool_calls:
+            log.info(
+                "agent_run_complete",
+                iteration=iteration,
+                source_count=len(aggregated_sources),
+            )
             if aggregated_sources:
                 yield _sse("sources", aggregated_sources)
             yield _sse("done", "")
@@ -183,14 +209,30 @@ async def run(
         )
 
         for tc in accumulated_tool_calls:
+            raw_args = tc["function"]["arguments"] or "{}"
             try:
-                args = json.loads(tc["function"]["arguments"] or "{}")
-            except json.JSONDecodeError:
+                args = json.loads(raw_args)
+            except json.JSONDecodeError as exc:
+                log.warning(
+                    "agent_tool_args_invalid_json",
+                    iteration=iteration,
+                    tool=tc["function"]["name"],
+                    raw_args=raw_args[:500],
+                    error=str(exc),
+                )
                 args = {}
             name = tc["function"]["name"]
+            log.info("agent_tool_dispatch", iteration=iteration, tool=name, args=args)
             yield _sse("tool_call", {"id": tc["id"], "name": name, "args": args})
 
             result = await tools.dispatch(name, args, ctx)
+            if isinstance(result, dict) and "error" in result:
+                log.warning(
+                    "agent_tool_returned_error",
+                    iteration=iteration,
+                    tool=name,
+                    error=result["error"],
+                )
             yield _sse("tool_result", {"id": tc["id"], "result": result})
 
             if name == "search_documents" and isinstance(result, dict):
@@ -205,6 +247,7 @@ async def run(
                 }
             )
 
+    log.warning("agent_max_iterations_reached", max_iterations=max_iterations)
     yield _sse("token", "[stopped: max tool iterations reached]")
     if aggregated_sources:
         yield _sse("sources", aggregated_sources)

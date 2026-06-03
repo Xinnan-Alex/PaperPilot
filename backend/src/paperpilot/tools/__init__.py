@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-logger = logging.getLogger(__name__)
+from paperpilot.logging import get_logger
+
+logger = get_logger().bind(component="tools")
 
 ToolHandler = Callable[[dict[str, Any], "ToolContext"], Awaitable[dict[str, Any]]]
 
@@ -49,9 +50,16 @@ def openai_tools() -> list[dict[str, Any]]:
 async def dispatch(name: str, args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     spec = REGISTRY.get(name)
     if spec is None:
+        logger.warning("tool_unknown", tool=name, user_id=ctx.user_id)
         return {"error": f"unknown tool: {name}"}
     try:
         return await spec["handler"](args, ctx)
     except Exception as exc:  # tool failures must never escape the agent loop
-        logger.exception("tool_handler_failed", extra={"tool": name})
+        logger.exception(
+            "tool_handler_failed",
+            tool=name,
+            user_id=ctx.user_id,
+            args=args,
+            exc_type=type(exc).__name__,
+        )
         return {"error": f"{type(exc).__name__}: {exc}"}

@@ -5,6 +5,8 @@ from typing import Any
 
 import litellm
 
+from paperpilot.logging import get_logger
+
 
 async def stream_completion(
     model: str,
@@ -31,7 +33,13 @@ async def stream_completion(
         kwargs["tools"] = tools
         kwargs["tool_choice"] = tool_choice
 
-    response = await litellm.acompletion(**kwargs)
+    log = get_logger().bind(component="llm", model=model)
+    try:
+        response = await litellm.acompletion(**kwargs)
+    except Exception:
+        log.exception("llm_acompletion_failed")
+        raise
+
     try:
         async for chunk in response:
             yield chunk
@@ -41,9 +49,14 @@ async def stream_completion(
         # this when the model emits a malformed tool call). End the stream
         # cleanly so the agent's empty-turn retry can recover.
         if "tool_use_failed" in str(exc):
+            log.warning("llm_tool_use_failed", error=str(exc))
             return
+        log.exception("llm_stream_value_error")
         raise litellm.InternalServerError(
             message=f"Stream error: {exc}",
             llm_provider="litellm",
             model=model,
         ) from exc
+    except Exception:
+        log.exception("llm_stream_failed")
+        raise

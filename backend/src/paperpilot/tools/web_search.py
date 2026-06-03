@@ -5,14 +5,17 @@ from typing import Any
 
 import httpx
 
+from paperpilot.logging import get_logger
 from paperpilot.tools import ToolContext, ToolSpec, register
 
 TAVILY_URL = "https://api.tavily.com/search"
 
 
 async def _handle(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    log = get_logger().bind(tool="web_search", user_id=ctx.user_id)
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
+        log.warning("web_search_disabled_no_api_key")
         return {"error": "web_search disabled: TAVILY_API_KEY not set"}
 
     query = str(args["query"])
@@ -23,10 +26,20 @@ async def _handle(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
         "max_results": max_results,
         "search_depth": "basic",
     }
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(TAVILY_URL, json=payload)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(TAVILY_URL, json=payload)
+    except httpx.HTTPError as exc:
+        log.exception("web_search_http_error", query=query[:200])
+        return {"error": f"tavily request error: {type(exc).__name__}: {exc}"}
 
     if resp.status_code >= 400:
+        log.error(
+            "web_search_failed",
+            query=query[:200],
+            status=resp.status_code,
+            body=resp.text[:500],
+        )
         return {"error": f"tavily request failed: {resp.status_code} {resp.text[:200]}"}
 
     data = resp.json()
