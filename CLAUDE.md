@@ -57,7 +57,7 @@ Each module has a single responsibility; they compose in `reader.py` and `api.py
 | `chunk.py` | Recursive semantic split (~800 chars, 100-char overlap). |
 | `embed.py` | Voyage AI `voyage-3-lite` API (512-dim). Batches 128 texts per call. |
 | `store.py` | Raw SQL via SQLAlchemy async — insert documents/chunks, update status, vector search, hard-delete document + chunks. |
-| `retrieve.py` | Hybrid search: pgvector cosine similarity + in-process BM25, merged via Reciprocal Rank Fusion. |
+| `retrieve.py` | Hybrid search: pgvector cosine similarity + Postgres full-text search (`tsvector`/`ts_rank_cd`), merged via Reciprocal Rank Fusion. |
 | `llm.py` | DeepSeek `deepseek-chat` via OpenAI-compatible SDK. **All LLM calls go through here only.** |
 | `reader.py` | Builds prompt, streams SSE events: `token`, `sources`, `confidence`, `done`. |
 | `auth.py` | JWKS-based asymmetric JWT verification (ES256/RS256) using `PyJWKClient`. |
