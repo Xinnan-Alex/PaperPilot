@@ -20,7 +20,7 @@ An agentic RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase
 ## Tools
 
 - `backend/src/paperpilot/tools/__init__.py` — `ToolSpec` TypedDict, `ToolContext` dataclass, `REGISTRY` dict, `register()`, `openai_tools()`, `async dispatch()` (catches all exceptions, returns `{"error": ...}`).
-- `backend/src/paperpilot/tools/search_docs.py` — `search_documents`: hybrid RAG via `embed_query` + `hybrid_search`.
+- `backend/src/paperpilot/tools/search_docs.py` — `search_documents`: hybrid RAG via `embed_query` + `hybrid_search` (pgvector cosine similarity + Postgres full-text search `tsvector`/`ts_rank_cd`, merged via Reciprocal Rank Fusion).
 - `backend/src/paperpilot/tools/docs.py` — `list_documents` and `get_document_summary` (first 5 chunks, 4000 chars).
 - `backend/src/paperpilot/tools/web_search.py` — `web_search` via Tavily API. Only registered if `TAVILY_API_KEY` is set.
 - Tools are registered at `api.py` module load time.

@@ -18,7 +18,7 @@
 
 - **Multi-format ingestion** — Upload PDF, DOCX, TXT, MD, or HTML files up to 20 MB.
 - **OCR fallback** — Scanned PDF pages are automatically extracted with Tesseract OCR.
-- **Semantic + lexical retrieval** — Hybrid search combining pgvector ANN similarity with BM25, merged via Reciprocal Rank Fusion (RRF).
+- **Semantic + lexical retrieval** — Hybrid search combining pgvector ANN similarity with Postgres full-text search (`tsvector`/`ts_rank_cd`), merged via Reciprocal Rank Fusion (RRF).
 - **Agentic tool loop** — The assistant decides which tools to call (up to 5 iterations) and synthesises a final answer from the results.
 - **Built-in tools** — `search_documents` (hybrid RAG), `list_documents`, `get_document_summary`, and optional `web_search` (Tavily).
 - **Multi-provider LLM** — Switch between OpenAI (gpt-4o, gpt-4o-mini), DeepSeek (deepseek-chat), Groq (llama-3.3-70b), and Mistral (mistral-large) per message. The provider/model registry lives in `backend/models.json` — add models, flip per-provider or per-model `enabled` flags, and mark one model as `default: true` without touching code. Models only surface if their provider is enabled, the model is enabled, and the API key env var is set.
@@ -177,7 +177,7 @@ sequenceDiagram
 2. **Chunk** — Recursive semantic splitting (≈800 chars, 100-char overlap).
 3. **Embed** — Voyage AI `voyage-3-lite` (512-dim vectors).
 4. **Store** — Supabase Postgres with `pgvector` HNSW index.
-5. **Retrieve** — Cosine similarity + BM25 + RRF reranking.
+5. **Retrieve** — Cosine similarity + Postgres FTS (`tsvector`/`ts_rank_cd`) + RRF reranking.
 6. **Agent** — LiteLLM provider abstraction, tool loop (up to 5 iterations), SSE streaming.
 
 ---

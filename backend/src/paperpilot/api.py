@@ -380,9 +380,11 @@ async def ingest_document(
         from sqlalchemy import text
 
         result = await session.execute(
-            text(
-                "SELECT filename, storage_path, status FROM documents WHERE id = :id AND user_id = :user_id"
-            ),
+            text("""
+                SELECT filename, storage_path, status
+                FROM documents
+                WHERE id = :id AND user_id = :user_id
+            """),
             {"id": body.doc_id, "user_id": user_id},
         )
         row = result.fetchone()
@@ -561,9 +563,11 @@ async def submit_feedback(
         # Validate that the referenced chunks belong to this user.
         if body.retrieved_chunk_ids:
             ownership = await session.execute(
-                text(
-                    "SELECT count(*) FROM chunks WHERE user_id = :user_id AND id = ANY(CAST(:ids AS uuid[]))"
-                ),
+                text("""
+                    SELECT count(*)
+                    FROM chunks
+                    WHERE user_id = :user_id AND id = ANY(CAST(:ids AS uuid[]))
+                """),
                 {"user_id": user_id, "ids": body.retrieved_chunk_ids},
             )
             if ownership.scalar_one() != len(body.retrieved_chunk_ids):
@@ -572,7 +576,10 @@ async def submit_feedback(
         fid: str = str(_uuid.uuid4())
         now: datetime = datetime.now(tz=datetime.timezone.utc)
         stmt = text("""
-            INSERT INTO feedback (id, user_id, query, answer, rating, retrieved_chunk_ids, created_at) VALUES (:id, :user_id, :query, :answer, :rating, :chunk_ids, :now)
+            INSERT INTO feedback (
+                id, user_id, query, answer, rating, retrieved_chunk_ids, created_at
+            )
+            VALUES (:id, :user_id, :query, :answer, :rating, :chunk_ids, :now)
         """)
         await session.execute(
             stmt,

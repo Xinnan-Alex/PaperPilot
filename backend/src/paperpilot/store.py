@@ -51,7 +51,10 @@ async def insert_chunks(
             )
             stmt = text("""
                 INSERT INTO chunks (id, document_id, user_id, ordinal, page, text, embedding)
-                VALUES (:id, :document_id, :user_id, :ordinal, :page, :text, CAST(:embedding AS vector))
+                VALUES (
+                    :id, :document_id, :user_id, :ordinal, :page, :text,
+                    CAST(:embedding AS vector)
+                )
             """)
             await session.execute(
                 stmt,

@@ -29,8 +29,12 @@ def client(monkeypatch: pytest.MonkeyPatch, clear_provider_env: None) -> TestCli
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
     from paperpilot import config
 
-    monkeypatch.setattr(config.settings, "supabase_jwks_url", "http://localhost/.well-known/jwks.json")
-    monkeypatch.setattr(config.settings, "supabase_db_url", "postgresql+asyncpg://user:pass@localhost/db")
+    monkeypatch.setattr(
+        config.settings, "supabase_jwks_url", "http://localhost/.well-known/jwks.json"
+    )
+    monkeypatch.setattr(
+        config.settings, "supabase_db_url", "postgresql+asyncpg://user:pass@localhost/db"
+    )
     from paperpilot import agent, api, auth
 
     api.app.dependency_overrides[auth.current_user] = lambda: "u-1"
@@ -43,7 +47,11 @@ def client(monkeypatch: pytest.MonkeyPatch, clear_provider_env: None) -> TestCli
     async def fake_stream(**kwargs: Any) -> AsyncIterator[Any]:
         yield _delta(content="hi")
 
+    async def fake_list_documents(session: Any, user_id: str) -> list[dict[str, Any]]:
+        return []
+
     monkeypatch.setattr(agent, "stream_completion", fake_stream)
+    monkeypatch.setattr(agent, "_list_user_documents", fake_list_documents)
     return TestClient(api.app)
 
 

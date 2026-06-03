@@ -47,7 +47,25 @@ def isolate_registry(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tools, "REGISTRY", {})
 
 
-async def test_agent_no_tool_calls_streams_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.fixture
+def no_user_documents(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_list_documents(session: Any, user_id: str) -> list[dict[str, Any]]:
+        return []
+
+    monkeypatch.setattr(agent, "_list_user_documents", fake_list_documents)
+
+
+@pytest.fixture
+def ready_user_documents(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_list_documents(session: Any, user_id: str) -> list[dict[str, Any]]:
+        return [{"id": "d-1", "status": "ready"}]
+
+    monkeypatch.setattr(agent, "_list_user_documents", fake_list_documents)
+
+
+async def test_agent_no_tool_calls_streams_tokens(
+    monkeypatch: pytest.MonkeyPatch, no_user_documents: None
+) -> None:
     monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
     monkeypatch.setattr(tools, "REGISTRY", {})
 
@@ -76,7 +94,9 @@ async def test_agent_no_tool_calls_streams_tokens(monkeypatch: pytest.MonkeyPatc
     assert "event: done" in joined
 
 
-async def test_agent_runs_one_tool_then_terminates(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_agent_runs_one_tool_then_terminates(
+    monkeypatch: pytest.MonkeyPatch, no_user_documents: None
+) -> None:
     monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
 
     called: list[dict[str, Any]] = []
@@ -126,7 +146,9 @@ async def test_agent_runs_one_tool_then_terminates(monkeypatch: pytest.MonkeyPat
     assert "event: done" in joined
 
 
-async def test_agent_enforces_max_iterations(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_agent_enforces_max_iterations(
+    monkeypatch: pytest.MonkeyPatch, no_user_documents: None
+) -> None:
     monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
 
     async def loop_handler(args: dict[str, Any], ctx: tools.ToolContext) -> dict[str, Any]:
@@ -163,7 +185,9 @@ async def test_agent_enforces_max_iterations(monkeypatch: pytest.MonkeyPatch) ->
     assert "event: done" in joined
 
 
-async def test_agent_respects_allowed_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_agent_respects_allowed_tools(
+    monkeypatch: pytest.MonkeyPatch, no_user_documents: None
+) -> None:
     monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
 
     async def _h(args: dict[str, Any], ctx: tools.ToolContext) -> dict[str, Any]:
@@ -206,6 +230,7 @@ async def test_agent_respects_allowed_tools(monkeypatch: pytest.MonkeyPatch) -> 
 
 async def test_agent_emits_sources_from_search_documents(
     monkeypatch: pytest.MonkeyPatch,
+    ready_user_documents: None,
 ) -> None:
     monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
 

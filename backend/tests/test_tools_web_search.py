@@ -59,9 +59,7 @@ async def test_web_search_returns_results(monkeypatch: pytest.MonkeyPatch) -> No
 async def test_web_search_handles_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
     web_search.register_tool_if_enabled()
-    respx.post("https://api.tavily.com/search").mock(
-        return_value=httpx.Response(500, text="boom")
-    )
+    respx.post("https://api.tavily.com/search").mock(return_value=httpx.Response(500, text="boom"))
     ctx = tools.ToolContext(user_id="u", access_token="t", doc_ids=None, db_session=None)
     result = await tools.dispatch("web_search", {"query": "x"}, ctx)
     assert "error" in result
