@@ -50,7 +50,6 @@ function ThemeIcon() {
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [animating, setAnimating] = useState(false);
   const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
-  const [flipping, setFlipping] = useState(false);
   const isDark = theme === "dark";
 
   useEffect(() => {
@@ -74,8 +73,21 @@ function ThemeIcon() {
     const cy = rect.top + rect.height / 2;
 
     setAnimating(true);
-    setFlipping(true);
     setRipple({ x: cx, y: cy });
+
+    el.animate(
+      [
+        { transform: "perspective(200px) rotateX(0deg)", offset: 0 },
+        { transform: "perspective(200px) rotateX(300deg)", offset: 0.6 },
+        { transform: "perspective(200px) rotateX(360deg)", offset: 0.8 },
+        { transform: "perspective(200px) rotateX(360deg)", offset: 1 },
+      ],
+      {
+        duration: 500,
+        easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        fill: "forwards",
+      }
+    );
 
     timersRef.current.push(setTimeout(() => {
       setTheme(isDark ? "light" : "dark");
@@ -83,7 +95,6 @@ function ThemeIcon() {
 
     timersRef.current.push(setTimeout(() => {
       setRipple(null);
-      setFlipping(false);
       setAnimating(false);
     }, 850));
   }, [animating, isDark, setTheme]);
@@ -95,12 +106,9 @@ function ThemeIcon() {
         onClick={handleClick}
         disabled={animating}
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${flipping ? (isDark ? "animate-[backflip-reverse_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]" : "animate-[backflip_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]") : ""}`}
-        style={flipping ? { perspective: "200px" as const, transformStyle: "preserve-3d" as const } : undefined}
+        className="grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow"
       >
-        <span className={flipping ? "animate-[fade-in_0.15s_ease_0.28s_both]" : ""}>
-          {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
-        </span>
+        {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
       </button>
 
       {ripple && (
@@ -109,12 +117,23 @@ function ThemeIcon() {
           className="pointer-events-none fixed z-50"
           style={{
             inset: 0,
-            "--ripple-x": `${ripple.x}px`,
-            "--ripple-y": `${ripple.y}px`,
-            clipPath: "circle(0% at var(--ripple-x) var(--ripple-y))",
-            animation: "ripple-expand 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards",
             background: "var(--paper)",
-          } as React.CSSProperties}
+            clipPath: `circle(0% at ${ripple.x}px ${ripple.y}px)`,
+          }}
+          ref={(el) => {
+            if (el) {
+              requestAnimationFrame(() => {
+                el.animate(
+                  { clipPath: `circle(150% at ${ripple.x}px ${ripple.y}px)` },
+                  {
+                    duration: 600,
+                    easing: "cubic-bezier(0.2, 0.8, 0.3, 1)",
+                    fill: "forwards",
+                  }
+                );
+              });
+            }
+          }}
         />
       )}
     </>
