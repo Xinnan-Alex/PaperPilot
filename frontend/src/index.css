@@ -119,6 +119,45 @@ body {
   }
 }
 
+@keyframes backflip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  60% {
+    transform: rotateX(300deg);
+  }
+  80% {
+    transform: rotateX(360deg);
+  }
+  100% {
+    transform: rotateX(360deg);
+  }
+}
+
+@keyframes backflip-reverse {
+  0% {
+    transform: rotateX(0deg);
+  }
+  60% {
+    transform: rotateX(-300deg);
+  }
+  80% {
+    transform: rotateX(-360deg);
+  }
+  100% {
+    transform: rotateX(-360deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Landing page (logged-out) — monochrome, Notion-style note app       */
 /* ------------------------------------------------------------------ */
