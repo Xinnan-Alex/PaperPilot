@@ -118,3 +118,149 @@ body {
     opacity: 1;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Landing page (logged-out) — monochrome, Notion-style note app       */
+/* ------------------------------------------------------------------ */
+
+.landing {
+  --paper: #ffffff;
+  --paper-2: #f7f6f3;       /* subtle hover / sidebar gray */
+  --ink: #2f2e2b;           /* Notion-ish warm near-black text */
+  --muted-ink: #8b8a85;
+  --mark: #ececea;          /* light gray highlight */
+  --card: #ffffff;
+  --line: #e9e8e4;
+  --btn: #2f2e2b;           /* near-black primary button */
+  --btn-ink: #ffffff;
+
+  --font-display: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-serif: "Fraunces", ui-serif, Georgia, serif;
+
+  position: relative;
+  min-height: 100svh;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(rgba(47, 46, 43, 0.04) 1px, transparent 1px);
+  background-size: 26px 26px;
+  overflow: hidden;
+}
+
+.dark .landing {
+  --paper: #191919;
+  --paper-2: #242423;
+  --ink: #e9e9e7;
+  --muted-ink: #8f8e8a;
+  --mark: #353533;
+  --card: #202020;
+  --line: #2f2f2e;
+  --btn: #e9e9e7;
+  --btn-ink: #191919;
+  background-image:
+    radial-gradient(rgba(233, 233, 231, 0.04) 1px, transparent 1px);
+}
+
+.l-display {
+  font-family: var(--font-display);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+}
+.l-serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+}
+.l-muted { color: var(--muted-ink); }
+
+/* flat highlight behind a word (Notion text highlight) */
+.l-mark {
+  position: relative;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.l-mark::after {
+  content: "";
+  position: absolute;
+  left: -0.1em;
+  right: -0.1em;
+  bottom: 0.05em;
+  height: 0.5em;
+  z-index: -1;
+  background: var(--mark);
+  border-radius: 0.12em;
+}
+
+/* dashed flight path — marching dashes */
+.l-flight {
+  stroke-dasharray: 6 10;
+  animation: dash-march 1.6s linear infinite;
+}
+@keyframes dash-march {
+  to { stroke-dashoffset: -32; }
+}
+
+/* paper plane bob */
+.l-plane {
+  animation: plane-bob 5.5s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes plane-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-12px) rotate(-5deg); }
+}
+
+/* staggered entrance */
+.l-rise {
+  opacity: 0;
+  animation: l-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes l-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* provider button pop-in */
+.l-pop {
+  opacity: 0;
+  animation: l-pop 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes l-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* primary CTA — solid near-black, soft lift on hover */
+.l-cta {
+  background: var(--btn);
+  color: var(--btn-ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+.l-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+  opacity: 0.92;
+}
+.l-cta:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
+.l-cta:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+
+/* secondary surface (provider buttons, chips, source pill) */
+.l-surface {
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: transform 0.16s ease, box-shadow 0.16s ease,
+    border-color 0.16s ease, background-color 0.16s ease;
+}
+.l-surface:hover {
+  transform: translateY(-1px);
+  background: var(--paper-2);
+  border-color: var(--muted-ink);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+}
+.l-surface:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+.l-surface:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
