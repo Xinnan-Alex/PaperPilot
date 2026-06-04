@@ -100,10 +100,12 @@ function ThemeIcon() {
           className="pointer-events-none fixed z-50"
           style={{
             inset: 0,
-            clipPath: `circle(0% at ${ripple.x}px ${ripple.y}px)`,
+            "--ripple-x": `${ripple.x}px`,
+            "--ripple-y": `${ripple.y}px`,
+            clipPath: "circle(0% at var(--ripple-x) var(--ripple-y))",
             animation: "ripple-expand 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards",
             background: "var(--paper)",
-          }}
+          } as React.CSSProperties}
         />
       )}
     </>

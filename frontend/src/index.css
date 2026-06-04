@@ -160,10 +160,10 @@ body {
 
 @keyframes ripple-expand {
   from {
-    clip-path: circle(0%);
+    clip-path: circle(0% at var(--ripple-x) var(--ripple-y));
   }
   to {
-    clip-path: circle(150%);
+    clip-path: circle(150% at var(--ripple-x) var(--ripple-y));
   }
 }
 
