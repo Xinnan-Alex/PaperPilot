@@ -12,7 +12,9 @@
           "display_name": "GPT-4o",
           "supports_tools": true,
           "context_window": 128000,
-          "enabled": true
+          "enabled": true,
+          "retrieval_top_k": 8,
+          "retrieval_context_chars": 16000
         },
         {
           "id": "gpt-4o-mini",
@@ -20,7 +22,9 @@
           "display_name": "GPT-4o mini",
           "supports_tools": true,
           "context_window": 128000,
-          "enabled": true
+          "enabled": true,
+          "retrieval_top_k": 8,
+          "retrieval_context_chars": 16000
         }
       ]
     },
