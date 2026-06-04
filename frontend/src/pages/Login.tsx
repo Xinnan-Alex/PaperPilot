@@ -4,13 +4,16 @@ import {
   ArrowRight,
   FileUp,
   Loader2,
+  Moon,
   Quote,
   Send,
   Sparkles,
+  Sun,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 
 const REPO_URL = "https://github.com/Xinnan-Alex/PaperPilot";
 
@@ -40,6 +43,72 @@ const GoogleMark = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
+function ThemeIcon() {
+  const { theme, setTheme } = useTheme();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [animating, setAnimating] = useState(false);
+  const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
+  const [flipping, setFlipping] = useState(false);
+  const isDark = theme === "dark";
+
+  const handleClick = useCallback(() => {
+    if (animating) return;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setTheme(isDark ? "light" : "dark");
+      return;
+    }
+
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    setAnimating(true);
+    setFlipping(true);
+    setRipple({ x: cx, y: cy });
+
+    setTimeout(() => {
+      setTheme(isDark ? "light" : "dark");
+    }, 280);
+
+    setTimeout(() => {
+      setRipple(null);
+      setFlipping(false);
+      setAnimating(false);
+    }, 850);
+  }, [animating, isDark, setTheme]);
+
+  return (
+    <>
+      <button
+        ref={ref}
+        onClick={handleClick}
+        disabled={animating}
+        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${flipping ? (isDark ? "animate-[backflip-reverse_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]" : "animate-[backflip_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]") : ""}`}
+        style={flipping ? { backfaceVisibility: "hidden" as const } : undefined}
+      >
+        <span className={flipping ? "animate-[fade-in_0.15s_ease_0.25s_both]" : ""}>
+          {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
+        </span>
+      </button>
+
+      {ripple && (
+        <div
+          className="pointer-events-none fixed z-50"
+          style={{
+            inset: 0,
+            clipPath: `circle(0% at ${ripple.x}px ${ripple.y}px)`,
+            animation: "ripple-expand 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards",
+            background: "var(--paper)",
+          }}
+        />
+      )}
+    </>
+  );
+}
 
 const features = [
   { icon: FileUp, label: "Upload PDF · DOCX · TXT" },
@@ -97,9 +166,7 @@ export default function Login() {
       {/* ---------- Header ---------- */}
       <header className="relative z-10 flex items-center justify-between px-5 py-5 sm:px-8">
         <div className="l-rise flex items-center gap-2.5">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm">
-            <Send className="h-4.5 w-4.5" />
-          </div>
+          <ThemeIcon />
           <span className="text-lg font-semibold tracking-tight">
             PaperPilot
           </span>
