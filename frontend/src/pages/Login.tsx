@@ -4,15 +4,27 @@ import {
   ArrowRight,
   FileUp,
   Loader2,
+  Moon,
   Quote,
   Send,
   Sparkles,
+  Sun,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 
 const REPO_URL = "https://github.com/Xinnan-Alex/PaperPilot";
+
+type ThemeName = "light" | "dark";
+type ViewTransitionHandle = {
+  ready: Promise<void>;
+  finished: Promise<void>;
+};
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => ViewTransitionHandle;
+};
 
 const GitHubMark = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -40,6 +52,125 @@ const GoogleMark = ({ className }: { className?: string }) => (
     />
   </svg>
 );
+
+function ThemeIcon() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const ref = useRef<HTMLButtonElement>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const animationsRef = useRef<Animation[]>([]);
+  const [animating, setAnimating] = useState(false);
+  const isDark = resolvedTheme === "dark";
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      animationsRef.current.forEach((animation) => animation.cancel());
+      animationsRef.current = [];
+    };
+  }, []);
+
+  const applyTheme = useCallback(
+    (nextTheme: ThemeName) => {
+      document.documentElement.classList.toggle("dark", nextTheme === "dark");
+      document.documentElement.style.colorScheme = nextTheme;
+      setTheme(nextTheme);
+    },
+    [setTheme]
+  );
+
+  const revealTheme = useCallback(
+    async (x: number, y: number, nextTheme: ThemeName) => {
+      const maxX = Math.max(x, window.innerWidth - x);
+      const maxY = Math.max(y, window.innerHeight - y);
+      const radius = Math.hypot(maxX, maxY);
+      const clipPath = [
+        `circle(0px at ${x}px ${y}px)`,
+        `circle(${radius}px at ${x}px ${y}px)`,
+      ];
+      const documentWithTransition = document as ViewTransitionDocument;
+
+      if (documentWithTransition.startViewTransition) {
+        const transition = documentWithTransition.startViewTransition(() => applyTheme(nextTheme));
+        await transition.ready.catch(() => undefined);
+        const animation = document.documentElement.animate(
+          { clipPath },
+          {
+            duration: 720,
+            easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+            pseudoElement: "::view-transition-new(root)",
+          } as KeyframeAnimationOptions
+        );
+        animationsRef.current.push(animation);
+        await animation.finished.catch(() => undefined);
+        await transition.finished.catch(() => undefined);
+        return;
+      }
+
+      const overlay = document.createElement("div");
+      overlay.setAttribute("aria-hidden", "true");
+      Object.assign(overlay.style, {
+        position: "fixed",
+        inset: "0",
+        zIndex: "50",
+        pointerEvents: "none",
+        background: nextTheme === "dark" ? "#191919" : "#ffffff",
+        clipPath: clipPath[0],
+      });
+      document.body.appendChild(overlay);
+      const animation = overlay.animate(
+        { clipPath },
+        {
+          duration: 720,
+          easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+          fill: "forwards",
+        }
+      );
+      animationsRef.current.push(animation);
+      await animation.finished.catch(() => undefined);
+      applyTheme(nextTheme);
+      overlay.remove();
+    },
+    [applyTheme]
+  );
+
+  const handleClick = useCallback(() => {
+    if (animating) return;
+    const nextTheme: ThemeName = isDark ? "light" : "dark";
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      applyTheme(nextTheme);
+      return;
+    }
+
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    setAnimating(true);
+
+    timersRef.current.push(setTimeout(() => {
+      void revealTheme(cx, cy, nextTheme).finally(() => {
+        setAnimating(false);
+      });
+    }, 1000));
+  }, [animating, applyTheme, isDark, revealTheme]);
+
+  return (
+    <>
+      <button
+        ref={ref}
+        onClick={handleClick}
+        disabled={animating}
+        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${animating ? "theme-icon-hithere" : ""}`}
+      >
+        {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
+      </button>
+    </>
+  );
+}
 
 const features = [
   { icon: FileUp, label: "Upload PDF · DOCX · TXT" },
@@ -97,9 +228,7 @@ export default function Login() {
       {/* ---------- Header ---------- */}
       <header className="relative z-10 flex items-center justify-between px-5 py-5 sm:px-8">
         <div className="l-rise flex items-center gap-2.5">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm">
-            <Send className="h-4.5 w-4.5" />
-          </div>
+          <ThemeIcon />
           <span className="text-lg font-semibold tracking-tight">
             PaperPilot
           </span>
