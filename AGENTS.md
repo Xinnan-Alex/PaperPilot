@@ -20,14 +20,14 @@ An agentic RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase
 ## Tools
 
 - `backend/src/paperpilot/tools/__init__.py` — `ToolSpec` TypedDict, `ToolContext` dataclass, `REGISTRY` dict, `register()`, `openai_tools()`, `async dispatch()` (catches all exceptions, returns `{"error": ...}`).
-- `backend/src/paperpilot/tools/search_docs.py` — `search_documents`: hybrid RAG via `embed_query` + `hybrid_search` (pgvector cosine similarity + Postgres full-text search `tsvector`/`ts_rank_cd`, merged via Reciprocal Rank Fusion).
+- `backend/src/paperpilot/tools/search_docs.py` — `search_documents`: multi-stage RAG. Query rewrite (`query_rewrite.expand_query`, multi-query expansion) → `embed_queries` → `multi_query_search` (per-variant `hybrid_search` of pgvector cosine + Postgres FTS `tsvector`/`ts_rank_cd`, RRF-fused into a candidate pool) → Voyage `rerank-2-lite` (`rerank.rerank_documents`) → per-model `top_k`/context budget → lexical citation spans (`citation.best_span`). Rerank and rewrite are independently toggleable (`enable_rerank`/`enable_query_rewrite`) and each degrades to the prior behaviour on failure.
 - `backend/src/paperpilot/tools/docs.py` — `list_documents` and `get_document_summary` (first 5 chunks, 4000 chars).
 - `backend/src/paperpilot/tools/web_search.py` — `web_search` via Tavily API. Only registered if `TAVILY_API_KEY` is set.
 - Tools are registered at `api.py` module load time.
 
 ## LLM Providers
 
-Providers and models are declared in `backend/models.json`. Each provider entry carries `display_name`, `enabled`, `api_key_env`, a `badge` (`{label, color}`), and a nested `models` array. Each model entry carries `id`, `litellm_id`, `display_name`, `supports_tools`, `context_window`, `enabled`, and an optional `default: true` flag (at most one across the manifest).
+Providers and models are declared in `backend/models.json`. Each provider entry carries `display_name`, `enabled`, `api_key_env`, a `badge` (`{label, color}`), and a nested `models` array. Each model entry carries `id`, `litellm_id`, `display_name`, `supports_tools`, `context_window`, `enabled`, an optional `default: true` flag (at most one across the manifest), and optional per-model retrieval budgets `retrieval_top_k` / `retrieval_context_chars` (fall back to the global `retrieval_top_k` / `retrieval_context_chars` in `config.py` when unset).
 
 Defaults shipped in `models.json`:
 
