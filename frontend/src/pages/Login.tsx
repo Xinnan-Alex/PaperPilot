@@ -18,11 +18,6 @@ import { useTheme } from "next-themes";
 const REPO_URL = "https://github.com/Xinnan-Alex/PaperPilot";
 
 type ThemeName = "light" | "dark";
-type FlightState = {
-  x: number;
-  y: number;
-  icon: "moon" | "sun";
-};
 type ViewTransitionHandle = {
   ready: Promise<void>;
   finished: Promise<void>;
@@ -64,7 +59,6 @@ function ThemeIcon() {
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const animationsRef = useRef<Animation[]>([]);
   const [animating, setAnimating] = useState(false);
-  const [flight, setFlight] = useState<FlightState | null>(null);
   const isDark = resolvedTheme === "dark";
 
   useEffect(() => {
@@ -155,11 +149,9 @@ function ThemeIcon() {
     const cy = rect.top + rect.height / 2;
 
     setAnimating(true);
-    setFlight({ x: cx, y: cy, icon: isDark ? "moon" : "sun" });
 
     timersRef.current.push(setTimeout(() => {
       void revealTheme(cx, cy, nextTheme).finally(() => {
-        setFlight(null);
         setAnimating(false);
       });
     }, 1000));
@@ -172,25 +164,10 @@ function ThemeIcon() {
         onClick={handleClick}
         disabled={animating}
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className="grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow"
+        className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${animating ? "theme-icon-hithere" : ""}`}
       >
-        <span className={animating ? "opacity-0" : undefined}>
-          {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
-        </span>
+        {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
       </button>
-
-      {flight && (
-        <div
-          aria-hidden={true}
-          className="theme-flight-icon"
-          style={{
-            left: `${flight.x}px`,
-            top: `${flight.y}px`,
-          }}
-        >
-          {flight.icon === "moon" ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
-        </div>
-      )}
     </>
   );
 }

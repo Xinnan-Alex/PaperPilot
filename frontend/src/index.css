@@ -133,43 +133,30 @@ body {
   z-index: 2;
 }
 
-.theme-flight-icon {
-  position: fixed;
-  z-index: 60;
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  place-items: center;
-  border-radius: var(--radius-lg);
-  background: var(--btn);
-  color: var(--btn-ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04);
-  pointer-events: none;
+.theme-icon-hithere {
   transform-origin: center;
   animation: theme-icon-hithere 1s ease forwards;
 }
 
 @keyframes theme-icon-hithere {
   0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
   30% {
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: scale(1.2);
   }
   40%,
   60% {
-    transform: translate(-50%, -50%) rotate(-20deg) scale(1.2);
+    transform: rotate(-20deg) scale(1.2);
   }
   50% {
-    transform: translate(-50%, -50%) rotate(20deg) scale(1.2);
+    transform: rotate(20deg) scale(1.2);
   }
   70% {
-    transform: translate(-50%, -50%) rotate(0deg) scale(1.2);
+    transform: rotate(0deg) scale(1.2);
   }
   100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
 }
 
