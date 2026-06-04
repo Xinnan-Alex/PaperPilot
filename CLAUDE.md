@@ -57,7 +57,10 @@ Each module has a single responsibility; they compose in `reader.py` and `api.py
 | `chunk.py` | Recursive semantic split (~800 chars, 100-char overlap). |
 | `embed.py` | Voyage AI `voyage-3-lite` API (512-dim). Batches 128 texts per call. |
 | `store.py` | Raw SQL via SQLAlchemy async — insert documents/chunks, update status, vector search, hard-delete document + chunks. |
-| `retrieve.py` | Hybrid search: pgvector cosine similarity + Postgres full-text search (`tsvector`/`ts_rank_cd`), merged via Reciprocal Rank Fusion. |
+| `retrieve.py` | Hybrid search (pgvector cosine + Postgres FTS, merged via Reciprocal Rank Fusion). `multi_query_search` fuses results across LLM-expanded query variants. |
+| `rerank.py` | Voyage `rerank-2-lite` reorders the fused candidate pool by query relevance. Degrades to identity order on failure. |
+| `query_rewrite.py` | One LLM call expands a query into variants for higher recall. Degrades to the original query. |
+| `citation.py` | Pure lexical `best_span` — char offsets of the best-matching sentence per chunk, for frontend highlighting. |
 | `llm.py` | DeepSeek `deepseek-chat` via OpenAI-compatible SDK. **All LLM calls go through here only.** |
 | `reader.py` | Builds prompt, streams SSE events: `token`, `sources`, `confidence`, `done`. |
 | `auth.py` | JWKS-based asymmetric JWT verification (ES256/RS256) using `PyJWKClient`. |
@@ -72,6 +75,8 @@ Each module has a single responsibility; they compose in `reader.py` and `api.py
 ### Query flow
 
 `POST /query` (SSE) → verify JWT → embed query → hybrid search → build prompt → stream DeepSeek tokens → emit `sources` and `done` events.
+
+The agent's `search_documents` tool runs a fuller pipeline: query rewrite (multi-query expansion) → fused candidate pool → Voyage rerank → per-model `top_k`/context budget (`models.json` `retrieval_top_k`/`retrieval_context_chars`, global defaults in `config.py`) → lexical citation spans. Rerank and rewrite are independently toggleable via `enable_rerank` / `enable_query_rewrite`.
 
 ### Chat sessions
 
