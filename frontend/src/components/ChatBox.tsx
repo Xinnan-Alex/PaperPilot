@@ -28,6 +28,30 @@ import {
 import { useSession } from "@/hooks/useSession";
 import MarkdownContent from "./MarkdownContent";
 
+function renderSourceText(src: SSESource) {
+  const { text } = src;
+  const start = src.span_start;
+  const end = src.span_end;
+  if (
+    start == null ||
+    end == null ||
+    start < 0 ||
+    end > text.length ||
+    start >= end
+  ) {
+    return text;
+  }
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark className="rounded-sm bg-primary/20 px-0.5 text-foreground">
+        {text.slice(start, end)}
+      </mark>
+      {text.slice(end)}
+    </>
+  );
+}
+
 interface AvailableDoc {
   id: string;
   filename: string;
@@ -386,7 +410,7 @@ export default function ChatBox({
                   Page: {src.page ?? "N/A"}
                 </p>
                 <p className="mt-1 line-clamp-3 text-muted-foreground">
-                  {src.text}
+                  {renderSourceText(src)}
                 </p>
               </div>
             ))}
