@@ -60,3 +60,28 @@ async def stream_completion(
     except Exception:
         log.exception("llm_stream_failed")
         raise
+
+
+async def complete(
+    model: str,
+    messages: list[dict[str, Any]],
+    temperature: float = 0.0,
+    max_tokens: int = 256,
+) -> str:
+    """Non-streaming completion → assistant message content (or "")."""
+    log = get_logger().bind(component="llm", model=model)
+    try:
+        response = await litellm.acompletion(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=False,
+        )
+    except Exception:
+        log.exception("llm_complete_failed")
+        raise
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        return ""
+    return getattr(choices[0].message, "content", "") or ""
