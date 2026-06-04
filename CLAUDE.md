@@ -84,6 +84,17 @@ Stored directly in Supabase `chat_sessions` table (`id, user_id, title, messages
 - `hooks/` — `useSession.ts` (Supabase auth), `useChatSessions.ts` (chat state), `useModels.ts`
 - `lib/` — API client (typed fetch with auth header), Supabase JS client init, `remarkCitations.ts` remark plugin (`[N]` → `<citation-marker>`), utils
 
+### Frontend design system
+
+**Aesthetic: monochrome, Notion-style note app.** Black/white/gray only — no chromatic accent colors. Two surface layers:
+
+- **App chrome** (authed app: `AppPage`, `Sidebar`, `ChatBox`, dialogs) → shadcn primitives in `components/ui/` styled with the semantic `@theme` tokens (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `border-border`, …). Never hardcode hex.
+- **Marketing / auth** (logged-out `Login.tsx` landing, future marketing pages) → the `.landing` scope + `l-*` helper classes in `src/index.css` (`l-display`, `l-cta`, `l-surface`, `l-mark`, `l-rise`, …) with the `--ink`/`--paper`/`--line`/`--btn` vars.
+
+Type: Geist (`font-sans`) for body/UI; **Fraunces** serif (via `l-display`) for marketing headlines only — loaded in `index.html`. Soft shadows + quiet hover (`translateY(-1px)`), `rounded-lg` default. Color only for third-party brand marks (Google's `G`) and `destructive` states.
+
+**When building any new component or page, follow the [`frontend-design-system`](.claude/skills/frontend-design-system/SKILL.md) skill** — it has the full token/helper reference and a pre-finish checklist.
+
 ### Markdown rendering
 
 Assistant messages render through `MarkdownContent.tsx`, which wraps `streamdown` (Vercel's drop-in for `react-markdown` purpose-built for partial LLM token streams). Streamdown bundles `remark-gfm`, `remend` for unterminated blocks, and `rehype-harden` + `rehype-sanitize` for safety. Citations (`[N]`) are converted to interactive buttons via the local `remarkCitations` plugin; the custom `<citation-marker>` tag is whitelisted through the sanitizer with `allowedTags={{ "citation-marker": ["n"] }}`.
