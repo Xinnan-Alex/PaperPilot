@@ -10,7 +10,7 @@ import {
   Sparkles,
   Sun,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -47,14 +47,22 @@ const GoogleMark = ({ className }: { className?: string }) => (
 function ThemeIcon() {
   const { theme, setTheme } = useTheme();
   const ref = useRef<HTMLButtonElement>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [animating, setAnimating] = useState(false);
   const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
   const [flipping, setFlipping] = useState(false);
   const isDark = theme === "dark";
 
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
+  }, []);
+
   const handleClick = useCallback(() => {
     if (animating) return;
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setTheme(isDark ? "light" : "dark");
       return;
     }
@@ -69,15 +77,15 @@ function ThemeIcon() {
     setFlipping(true);
     setRipple({ x: cx, y: cy });
 
-    setTimeout(() => {
+    timersRef.current.push(setTimeout(() => {
       setTheme(isDark ? "light" : "dark");
-    }, 280);
+    }, 280));
 
-    setTimeout(() => {
+    timersRef.current.push(setTimeout(() => {
       setRipple(null);
       setFlipping(false);
       setAnimating(false);
-    }, 850);
+    }, 850));
   }, [animating, isDark, setTheme]);
 
   return (
@@ -90,13 +98,14 @@ function ThemeIcon() {
         className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${flipping ? (isDark ? "animate-[backflip-reverse_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]" : "animate-[backflip_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]") : ""}`}
         style={flipping ? { backfaceVisibility: "hidden" as const } : undefined}
       >
-        <span className={flipping ? "animate-[fade-in_0.15s_ease_0.25s_both]" : ""}>
+        <span className={flipping ? "animate-[fade-in_0.15s_ease_0.28s_both]" : ""}>
           {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
         </span>
       </button>
 
       {ripple && (
         <div
+          aria-hidden={true}
           className="pointer-events-none fixed z-50"
           style={{
             inset: 0,
