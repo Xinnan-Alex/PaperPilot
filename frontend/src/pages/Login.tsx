@@ -162,7 +162,7 @@ function ThemeIcon() {
         setFlight(null);
         setAnimating(false);
       });
-    }, 620));
+    }, 1000));
   }, [animating, applyTheme, isDark, revealTheme]);
 
   return (

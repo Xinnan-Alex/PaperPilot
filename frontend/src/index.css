@@ -143,29 +143,30 @@ body {
   color: var(--btn-ink);
   pointer-events: none;
   transform-origin: center;
-  animation: theme-icon-jump-land 0.62s cubic-bezier(0.2, 0.85, 0.2, 1) forwards;
+  animation: theme-icon-hithere 1s ease forwards;
 }
 
-@keyframes theme-icon-jump-land {
+@keyframes theme-icon-hithere {
   0% {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
-  18% {
-    transform: translate(-50%, -50%) translateY(3px) scale(1.04, 0.94);
+  30% {
+    transform: translate(-50%, -50%) scale(1.2);
   }
-  48% {
-    transform: translate(-50%, -50%) translateY(-38px) scale(0.98, 1.05);
+  40%,
+  60% {
+    transform: translate(-50%, -50%) rotate(-20deg) scale(1.2);
   }
-  76% {
-    transform: translate(-50%, -50%) translateY(-8px) scale(1.01);
+  50% {
+    transform: translate(-50%, -50%) rotate(20deg) scale(1.2);
   }
-  88% {
-    transform: translate(-50%, -50%) translateY(4px) scale(1.08, 0.9);
+  70% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1.2);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
