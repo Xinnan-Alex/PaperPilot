@@ -101,6 +101,7 @@ async def run(
         access_token=access_token,
         doc_ids=doc_ids,
         db_session=db_session,
+        model=spec,
     )
     all_defs = tools.openai_tools()
     if allowed_tools is None:

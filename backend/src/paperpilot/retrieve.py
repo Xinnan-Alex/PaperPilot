@@ -76,3 +76,30 @@ async def hybrid_search(
         merged.values(), key=lambda r: scores.get(r["id"], 0), reverse=True
     )
     return ranked[:k]
+
+
+async def multi_query_search(
+    session: AsyncSession,
+    user_id: str,
+    queries: list[str],
+    query_embeddings: list[list[float]],
+    pool: int,
+    doc_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Run hybrid_search for each (query, embedding) pair and RRF-fuse all
+    results into a unique-chunk candidate pool of size `pool`."""
+    scores: dict[str, float] = {}
+    merged: dict[str, dict[str, Any]] = {}
+    per_query_k = max(pool, 5)
+    for query, embedding in zip(queries, query_embeddings):
+        results = await hybrid_search(
+            session, user_id, query, embedding, k=per_query_k, doc_ids=doc_ids
+        )
+        for rank, r in enumerate(results):
+            cid: str = r["id"]
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (60 + rank + 1)
+            merged.setdefault(cid, r)
+    ranked: list[dict[str, Any]] = sorted(
+        merged.values(), key=lambda r: scores[r["id"]], reverse=True
+    )
+    return ranked[:pool]

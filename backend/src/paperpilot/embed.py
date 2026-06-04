@@ -43,19 +43,28 @@ def embed_documents(texts: list[str], batch_size: int = 128) -> list[list[float]
     return all_embeddings
 
 
-def embed_query(text: str) -> list[float]:
+def embed_queries(texts: list[str], batch_size: int = 128) -> list[list[float]]:
     client: voyageai.Client = _get_client()
-    try:
-        result = client.embed(
-            [text],
-            model=settings.embedding_model,
-            input_type="query",
-        )
-    except Exception:
-        _log.exception(
-            "voyage_embed_query_failed",
-            model=settings.embedding_model,
-            query_chars=len(text),
-        )
-        raise
-    return result.embeddings[0]
+    all_embeddings: list[list[float]] = []
+    for i in range(0, len(texts), batch_size):
+        batch: list[str] = texts[i : i + batch_size]
+        try:
+            result = client.embed(
+                batch,
+                model=settings.embedding_model,
+                input_type="query",
+            )
+        except Exception:
+            _log.exception(
+                "voyage_embed_queries_failed",
+                model=settings.embedding_model,
+                batch_index=i // batch_size,
+                batch_size=len(batch),
+            )
+            raise
+        all_embeddings.extend(result.embeddings)
+    return all_embeddings
+
+
+def embed_query(text: str) -> list[float]:
+    return embed_queries([text])[0]
