@@ -96,7 +96,7 @@ function ThemeIcon() {
         disabled={animating}
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
         className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${flipping ? (isDark ? "animate-[backflip-reverse_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]" : "animate-[backflip_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]") : ""}`}
-        style={flipping ? { backfaceVisibility: "hidden" as const } : undefined}
+        style={flipping ? { perspective: "200px" as const, transformStyle: "preserve-3d" as const } : undefined}
       >
         <span className={flipping ? "animate-[fade-in_0.15s_ease_0.28s_both]" : ""}>
           {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
