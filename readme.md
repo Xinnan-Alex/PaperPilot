@@ -29,7 +29,7 @@
 - **Provider-agnostic formatting** — The system prompt constrains the LLM to a restricted Markdown subset (paragraphs, `**bold**`, lists, code, citations) so output looks consistent whether the answer came from DeepSeek, OpenAI, Groq, or Mistral.
 - **Source provenance** — Every answer shows retrieved source cards with filename, page number, and text snippet, with the best-matching sentence highlighted (lexical citation span).
 - **Persistent chat history** — All conversations stored in Supabase, synced across devices. Chat list in the sidebar; click any past chat to resume.
-- **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed.
+- **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed. Attached filenames stay visible after the picker closes and when you reopen a chat.
 - **Document deletion** — Hard-delete any uploaded document from the Documents panel. Removes the file from Storage, all text chunks, and embeddings with no recovery. Deleted docs are automatically removed from all active chat sessions.
 - **Auth & security** — GitHub OAuth via Supabase Auth; JWT verification on every API call; Row Level Security in Postgres; per-user rate limiting.
 - **Feedback loop** — Thumbs up/down on assistant messages.
