@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     default_model_id: str = "deepseek-chat"
     agent_max_iterations: int = 5
 
+    # Retrieval pipeline
+    rerank_model: str = "rerank-2-lite"
+    enable_rerank: bool = True
+    enable_query_rewrite: bool = True
+    query_rewrite_variants: int = 2
+    retrieval_top_k: int = 5
+    retrieval_candidate_pool: int = 30
+    retrieval_context_chars: int = 8000
+
     # Eval / judge (existing)
     judge_model: str = "gpt-4o-mini"
     judge_base_url: str = "https://api.openai.com/v1"
