@@ -26,9 +26,8 @@ export default function ToolCallBubble({ tool }: { tool: ToolCallState }) {
   const detail = shortArg(tool.args);
 
   return (
-    <div
+    <output
       className="my-2 inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-xs"
-      role="status"
       aria-live="polite"
     >
       {tool.state === "running" ? (
@@ -46,6 +45,6 @@ export default function ToolCallBubble({ tool }: { tool: ToolCallState }) {
           {detail}
         </span>
       )}
-    </div>
+    </output>
   );
 }

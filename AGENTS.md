@@ -73,6 +73,7 @@ OpenAI account scoping: if your `OPENAI_API_KEY` is bound to an organization or 
 - **Dev server:** `pnpm dev` (Vite, port 5173 by default).
 - **Build:** `pnpm build` (`tsc -b && vite build`).
 - **Lint:** `pnpm lint` (ESLint + typescript-eslint + react-hooks + react-refresh).
+- **Health scan:** `pnpm doctor` (React Doctor; also runs in CI on every PR touching `frontend/`).
 - **Tailwind:** v4 configured via `@theme` block in `src/index.css`. There is no `tailwind.config.ts`.
 - **shadcn/ui:** Components live in `src/components/ui/`. Utility `cn` is in `src/lib/utils.tsx`.
 - **Design system:** monochrome, Notion-style note app — **no chromatic accent colors**. Two layers: app chrome uses shadcn primitives + semantic `@theme` tokens (`bg-background`, `text-muted-foreground`, `border-border`, …); marketing/auth surfaces (`Login.tsx`) use the `.landing` scope + `l-*` helpers in `src/index.css`. Body font Geist (`font-sans`); Fraunces serif (`l-display`) for marketing headlines only. Soft shadows, `rounded-lg`, quiet hover. Color only for third-party brand marks and `destructive`. **Any new component/page must follow the `.claude/skills/frontend-design-system/` skill** (full token/helper reference + checklist).
@@ -86,6 +87,7 @@ OpenAI account scoping: if your `OPENAI_API_KEY` is bound to an organization or 
 
 - Migrations live in `supabase/migrations/`.
 - CI workflow `.github/workflows/supabase-prod.yml` runs `supabase db push` on every push to `main`.
+- CI workflow `.github/workflows/react-doctor.yml` runs React Doctor (`--diff` mode) on every PR touching `frontend/`.
 - Local dev: use `supabase db push` or the Supabase CLI to apply migrations to your linked project.
 
 ## Deployment

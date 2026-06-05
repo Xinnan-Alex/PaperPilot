@@ -30,6 +30,12 @@ interface SidebarProps {
   onMobileClose: () => void;
 }
 
+// Stateless — closes over nothing from the component, so it lives at module
+// scope (one binding) rather than being recreated on every render.
+const handleSignOut = async () => {
+  await supabase.auth.signOut();
+};
+
 export default function Sidebar({
   sessions,
   activeChatId,
@@ -44,10 +50,6 @@ export default function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const { user } = useSession();
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
 
   const displayName =
     user?.user_metadata?.user_name ||
@@ -187,6 +189,7 @@ export default function Sidebar({
               {sessions.map((session) => (
                 <li key={session.id} className="group relative">
                   <button
+                    type="button"
                     onClick={() => handleSelectChat(session.id)}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-sidebar-accent",

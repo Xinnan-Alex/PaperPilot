@@ -1,2 +1,28 @@
+# Supply-chain hardening (react-doctor/require-pnpm-hardening):
+# - minimumReleaseAge: wait 7 days before installing a freshly published version,
+#   so malware that ships and is unpublished within hours is never pulled in.
+# - trustPolicy: refuse packages whose provenance/signature trust weakens between resolutions.
+# - blockExoticSubdeps: keep registry-only deps; never allow git:/file:/tarball transitive deps.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+
+# Narrow, version-pinned exception to trustPolicy: no-downgrade.
+# semver@6.3.1 is pulled transitively by the @babel toolchain (via
+# @vitejs/plugin-react). Its "trust downgrade" flag is a provenance artifact —
+# 6.3.1 predates npm attestation, so its trust evidence looks weaker than later
+# versions. It is one of the most-used packages on npm and @babel pins it.
+# Only this exact version is exempted; every other package/version stays strict.
+trustPolicyExclude:
+  - 'semver@6.3.1'
+
+# Version-pinned exception to minimumReleaseAge. tinyexec@1.2.4 is a deep
+# transitive (@iconify/utils → @antfu/install-pkg → tinyexec) that was published
+# only days ago, so it trips the 7-day age gate. It's a tiny, widely-used exec
+# helper and this exact version is vetted. Only 1.2.4 is exempted — any future
+# tinyexec release still serves the full minimumReleaseAge waiting period.
+minimumReleaseAgeExclude:
+  - 'tinyexec@1.2.4'
+
 allowBuilds:
   msw: true

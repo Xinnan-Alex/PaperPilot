@@ -1,0 +1,44 @@
+name: React Doctor
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so --diff can resolve the PR base branch.
+          fetch-depth: 0
+
+      # pnpm 11 — required for the supply-chain settings in pnpm-workspace.yaml
+      # (minimumReleaseAge, trustPolicy) and the pnpm-11-generated lockfile.
+      # Pinned here because there's no root package.json / packageManager field
+      # for the action to infer the version from.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          # Node 22 — current pnpm 11.x requires >= 22.13.
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # --diff scans only files changed vs the PR base, so existing debt never
+      # blocks a PR while newly introduced issues are caught before merge.
+      # Use npx, not `pnpm dlx`: dlx would apply this workspace's pnpm
+      # supply-chain policy (trustPolicy/minimumReleaseAge) to react-doctor's
+      # OWN transitive deps and fail. The tool isn't a project dependency.
+      - name: Scan changed files
+        run: npx --yes react-doctor@latest --verbose --diff
