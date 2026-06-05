@@ -1,0 +1,225 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "type": "text", "id": "t_title",
+      "x": 60, "y": 30, "width": 800, "height": 34,
+      "text": "Ingestion status / stage state machine",
+      "originalText": "Ingestion status / stage state machine",
+      "fontSize": 26, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500001, "version": 1, "versionNonce": 500002, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "text", "id": "t_sub",
+      "x": 60, "y": 70, "width": 900, "height": 20,
+      "text": "status is the coarse machine; stage is the live substep inside processing. Failed is terminal-but-recoverable.",
+      "originalText": "status is the coarse machine; stage is the live substep inside processing. Failed is terminal-but-recoverable.",
+      "fontSize": 14, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500003, "version": 1, "versionNonce": 500004, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+
+    {
+      "type": "ellipse", "id": "st_pending",
+      "x": 60, "y": 220, "width": 170, "height": 86,
+      "strokeColor": "#c2410c", "backgroundColor": "#fed7aa", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500010, "version": 1, "versionNonce": 500011, "isDeleted": false,
+      "groupIds": [], "boundElements": [{"id": "st_pending_t", "type": "text"}, {"id": "a_pend_proc", "type": "arrow"}], "link": null, "locked": false, "roundness": {"type": 2}
+    },
+    {
+      "type": "text", "id": "st_pending_t",
+      "x": 70, "y": 250, "width": 150, "height": 26,
+      "text": "pending\n(after upload)",
+      "originalText": "pending\n(after upload)",
+      "fontSize": 14, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500012, "version": 1, "versionNonce": 500013, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": "st_pending", "lineHeight": 1.25
+    },
+
+    {
+      "type": "rectangle", "id": "st_proc",
+      "x": 400, "y": 196, "width": 320, "height": 134,
+      "strokeColor": "#1e3a5f", "backgroundColor": "#dbeafe", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500020, "version": 1, "versionNonce": 500021, "isDeleted": false,
+      "groupIds": [], "boundElements": [{"id": "st_proc_t", "type": "text"}, {"id": "a_proc_ready", "type": "arrow"}, {"id": "a_proc_fail", "type": "arrow"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "st_proc_t",
+      "x": 414, "y": 222, "width": 292, "height": 82,
+      "text": "processing\n— stage advances —\ndownloading → extracting →\nchunking → embedding → storing",
+      "originalText": "processing\n— stage advances —\ndownloading → extracting →\nchunking → embedding → storing",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500022, "version": 1, "versionNonce": 500023, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": "st_proc", "lineHeight": 1.3
+    },
+
+    {
+      "type": "ellipse", "id": "st_ready",
+      "x": 880, "y": 220, "width": 170, "height": 86,
+      "strokeColor": "#047857", "backgroundColor": "#a7f3d0", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500030, "version": 1, "versionNonce": 500031, "isDeleted": false,
+      "groupIds": [], "boundElements": [{"id": "st_ready_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 2}
+    },
+    {
+      "type": "text", "id": "st_ready_t",
+      "x": 890, "y": 250, "width": 150, "height": 26,
+      "text": "ready\nstage = NULL",
+      "originalText": "ready\nstage = NULL",
+      "fontSize": 14, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500032, "version": 1, "versionNonce": 500033, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": "st_ready", "lineHeight": 1.25
+    },
+
+    {
+      "type": "ellipse", "id": "st_fail",
+      "x": 460, "y": 470, "width": 200, "height": 92,
+      "strokeColor": "#b91c1c", "backgroundColor": "#fecaca", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500040, "version": 1, "versionNonce": 500041, "isDeleted": false,
+      "groupIds": [], "boundElements": [{"id": "st_fail_t", "type": "text"}, {"id": "a_fail_proc", "type": "arrow"}], "link": null, "locked": false, "roundness": {"type": 2}
+    },
+    {
+      "type": "text", "id": "st_fail_t",
+      "x": 470, "y": 500, "width": 180, "height": 32,
+      "text": "failed\nstage = failing step\nerror_detail set",
+      "originalText": "failed\nstage = failing step\nerror_detail set",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#b91c1c", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500042, "version": 1, "versionNonce": 500043, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": "st_fail", "lineHeight": 1.25
+    },
+
+    {
+      "type": "arrow", "id": "a_pend_proc",
+      "x": 232, "y": 263, "width": 166, "height": 0,
+      "strokeColor": "#1e3a5f", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500050, "version": 1, "versionNonce": 500051, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [166, 0]],
+      "startBinding": {"elementId": "st_pending", "focus": 0, "gap": 2}, "endBinding": {"elementId": "st_proc", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "l_pend_proc",
+      "x": 244, "y": 234, "width": 150, "height": 18,
+      "text": "POST /ingest",
+      "originalText": "POST /ingest",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500052, "version": 1, "versionNonce": 500053, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_proc_ready",
+      "x": 722, "y": 263, "width": 156, "height": 0,
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500054, "version": 1, "versionNonce": 500055, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [156, 0]],
+      "startBinding": {"elementId": "st_proc", "focus": 0, "gap": 2}, "endBinding": {"elementId": "st_ready", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "l_proc_ready",
+      "x": 726, "y": 234, "width": 150, "height": 18,
+      "text": "all stages ok",
+      "originalText": "all stages ok",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500056, "version": 1, "versionNonce": 500057, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_proc_fail",
+      "x": 540, "y": 332, "width": 0, "height": 136,
+      "strokeColor": "#b91c1c", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500058, "version": 1, "versionNonce": 500059, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [0, 136]],
+      "startBinding": {"elementId": "st_proc", "focus": 0, "gap": 2}, "endBinding": {"elementId": "st_fail", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "l_proc_fail",
+      "x": 188, "y": 386, "width": 340, "height": 18,
+      "text": "_IngestError(stage, detail)  —  any step raises",
+      "originalText": "_IngestError(stage, detail)  —  any step raises",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "right", "verticalAlign": "top",
+      "strokeColor": "#b91c1c", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500060, "version": 1, "versionNonce": 500061, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_fail_proc",
+      "x": 662, "y": 506, "width": 200, "height": 226,
+      "strokeColor": "#b45309", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "dashed", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500062, "version": 1, "versionNonce": 500063, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [200, 0], [200, -226], [60, -226]],
+      "startBinding": {"elementId": "st_fail", "focus": 0, "gap": 2}, "endBinding": {"elementId": "st_proc", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "l_fail_proc",
+      "x": 700, "y": 392, "width": 260, "height": 36,
+      "text": "re-ingest: POST /ingest\nresets stage + clears error_detail",
+      "originalText": "re-ingest: POST /ingest\nresets stage + clears error_detail",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#b45309", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500064, "version": 1, "versionNonce": 500065, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_proc_self",
+      "x": 470, "y": 196, "width": 180, "height": 40,
+      "strokeColor": "#b45309", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1.5, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500066, "version": 1, "versionNonce": 500067, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [0, -34], [180, -34], [180, 0]],
+      "startBinding": {"elementId": "st_proc", "focus": 0, "gap": 2}, "endBinding": {"elementId": "st_proc", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "l_proc_self",
+      "x": 360, "y": 150, "width": 420, "height": 18,
+      "text": "download & embed retried ×3 (exp backoff, off event loop)",
+      "originalText": "download & embed retried ×3 (exp backoff, off event loop)",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#b45309", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+      "angle": 0, "seed": 500068, "version": 1, "versionNonce": 500069, "isDeleted": false,
+      "groupIds": [], "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": 20
+  },
+  "files": {}
+}
