@@ -10,6 +10,24 @@ interface Doc {
   id: string;
   filename: string;
   status: string;
+  stage?: string | null;
+  error_detail?: string | null;
+}
+
+// Fine-grained ingest sub-step → friendly label shown while processing.
+const STAGE_LABELS: Record<string, string> = {
+  downloading: "Downloading",
+  extracting: "Extracting text",
+  chunking: "Chunking",
+  embedding: "Embedding",
+  storing: "Saving",
+};
+
+function statusLabel(doc: Doc): string {
+  if (doc.status === "ready") return "ready";
+  if (doc.status === "failed") return "failed";
+  if (doc.stage && STAGE_LABELS[doc.stage]) return STAGE_LABELS[doc.stage];
+  return doc.status;
 }
 
 const ALLOWED_TYPES = [
@@ -259,7 +277,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
                       ) : (
                         <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                       )}
-                      {doc.status}
+                      {statusLabel(doc)}
                     </Badge>
                     {deleting === doc.id ? (
                       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
@@ -277,6 +295,11 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
                       </Button>
                     )}
                   </div>
+                  {doc.status === "failed" && doc.error_detail && (
+                    <p className="mt-1.5 text-[10px] leading-tight text-destructive/90">
+                      {doc.error_detail}
+                    </p>
+                  )}
                   {confirmDeleteId === doc.id && (
                     <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
                       <span className="text-[10px] text-destructive leading-tight">

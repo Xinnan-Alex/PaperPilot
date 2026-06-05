@@ -71,7 +71,9 @@ Each module has a single responsibility; they compose in `reader.py` and `api.py
 
 ### Document ingestion flow
 
-`POST /upload` → saves to Supabase Storage, inserts `documents` row as `pending` → `POST /ingest` → background task: extract → chunk → embed → insert chunks → update status to `ready`. Frontend polls `GET /documents/{id}` every 2s.
+`POST /upload` → saves to Supabase Storage, inserts `documents` row as `pending` (deletes the orphaned Storage object if the insert fails) → `POST /ingest` → background task: extract → chunk → embed → insert chunks → update status to `ready`. Frontend polls `GET /documents/{id}` every 2s.
+
+The background task records a fine-grained `documents.stage` (`downloading` → `extracting` → `chunking` → `embedding` → `storing`) for live progress, persists a truncated `error_detail` on failure, and tracks `retry_count`/`updated_at`. Download and embed run off the event loop (`asyncio.to_thread`) with exponential-backoff retries; deterministic steps (extract) are not retried. `status` stays the coarse machine: `pending`/`processing`/`ready`/`failed`. Failed docs are re-ingestable (re-`POST /ingest` resets stage/error).
 
 ### Query flow
 
