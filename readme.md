@@ -294,9 +294,11 @@ paperpilot/
 │   │   │   ├── ToolCallBubble.tsx   # Inline tool activity display
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── UploadBox.tsx
+│   │   │   ├── BrandMark.tsx        # Shared paper-plane logo (sidebar, chat empty-state, landing)
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── hooks/
 │   │   │   ├── useChatSessions.ts
+│   │   │   ├── useThemeTransition.ts # Shared circular theme-switch reveal (both toggles)
 │   │   │   └── useSession.ts
 │   │   └── lib/                 # API client, Supabase init, remarkCitations plugin, utils
 │   ├── package.json

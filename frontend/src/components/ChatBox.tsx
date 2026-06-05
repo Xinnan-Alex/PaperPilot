@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import MarkdownContent from "./MarkdownContent";
+import { BrandMark } from "./BrandMark";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface AvailableDoc {
   id: string;
@@ -590,14 +592,13 @@ export default function ChatBox({
         <h1 className="flex-1 truncate text-sm font-medium">
           {chatTitle ?? "PaperPilot"}
         </h1>
+        <ThemeToggle />
       </div>
 
       {!hasMessages ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto px-3 py-6 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-              <span className="text-lg">✈️</span>
-            </div>
+            <BrandMark className="h-10 w-10" />
             <h1 className="text-3xl font-normal tracking-tight">
               Hello, {displayName}
             </h1>
