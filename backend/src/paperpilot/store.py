@@ -75,9 +75,37 @@ async def update_document_status(
     session: AsyncSession,
     document_id: str,
     status: str,
+    *,
+    stage: str | None = None,
+    error_detail: str | None = None,
+    increment_retry: bool = False,
 ) -> None:
-    stmt = text("UPDATE documents SET status = :status WHERE id = :id")
-    await session.execute(stmt, {"status": status, "id": document_id})
+    """Update a document's coarse status plus observability fields.
+
+    `stage` records the sub-step within `processing`; `error_detail` carries a
+    truncated failure reason. Both are written unconditionally (passing the
+    defaults clears a prior error on re-ingest). `updated_at` is always bumped
+    so stalled ingests are detectable.
+    """
+    set_clauses = [
+        "status = :status",
+        "stage = :stage",
+        "error_detail = :error_detail",
+        "updated_at = :now",
+    ]
+    if increment_retry:
+        set_clauses.append("retry_count = retry_count + 1")
+    stmt = text(f"UPDATE documents SET {', '.join(set_clauses)} WHERE id = :id")
+    await session.execute(
+        stmt,
+        {
+            "status": status,
+            "stage": stage,
+            "error_detail": (error_detail[:1000] if error_detail else None),
+            "now": datetime.utcnow(),
+            "id": document_id,
+        },
+    )
     await session.commit()
 
 
@@ -133,7 +161,7 @@ async def list_documents(
     user_id: str,
 ) -> list[dict[str, Any]]:
     stmt = text("""
-        SELECT id, filename, status, created_at
+        SELECT id, filename, status, stage, error_detail, retry_count, created_at
         FROM documents
         WHERE user_id = :user_id
         ORDER BY created_at DESC
@@ -173,7 +201,7 @@ async def get_document(
     doc_id: str,
 ) -> dict[str, Any] | None:
     stmt = text("""
-        SELECT id, filename, status, created_at
+        SELECT id, filename, status, stage, error_detail, retry_count, created_at
         FROM documents
         WHERE id = :doc_id AND user_id = :user_id
     """)

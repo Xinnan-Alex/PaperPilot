@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import tempfile
 import time
 import uuid as _uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import PosixPath
 from typing import Any
 from urllib.parse import quote
@@ -293,62 +295,162 @@ async def upload_file(
             )
             raise HTTPException(status_code=502, detail=f"Storage upload failed: {resp.text}")
 
-    async for session in get_db():
-        doc_id: str = await insert_document(session, user_id, original_filename, storage_path)
-        get_logger().info(
-            "document_uploaded",
+    try:
+        async for session in get_db():
+            doc_id: str = await insert_document(session, user_id, original_filename, storage_path)
+    except Exception:
+        # The object is already in Storage but has no documents row pointing at
+        # it — an unreachable orphan. Best-effort delete so it does not linger.
+        get_logger().exception(
+            "document_insert_failed_cleaning_storage",
             user_id=user_id,
-            doc_id=doc_id,
-            filename=original_filename,
-            size_bytes=len(contents),
+            storage_path=storage_path,
         )
-        return {"doc_id": doc_id, "filename": original_filename}
+        encoded_path = quote(storage_path, safe="/")
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.delete(
+                f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{encoded_path}",
+                headers=supabase_admin_headers(),
+            )
+        raise HTTPException(status_code=502, detail="Failed to record uploaded document")
+
+    get_logger().info(
+        "document_uploaded",
+        user_id=user_id,
+        doc_id=doc_id,
+        filename=original_filename,
+        size_bytes=len(contents),
+    )
+    return {"doc_id": doc_id, "filename": original_filename}
+
+
+async def _set_doc_stage(
+    doc_id: str,
+    status: str,
+    *,
+    stage: str | None = None,
+    error_detail: str | None = None,
+) -> None:
+    """Persist a status/stage transition on its own short-lived DB session."""
+    async for session in get_db():
+        await update_document_status(
+            session, doc_id, status, stage=stage, error_detail=error_detail
+        )
+
+
+async def _with_retry(
+    factory: Callable[[], Awaitable[Any]],
+    *,
+    label: str,
+    log: Any,
+    attempts: int = 3,
+) -> Any:
+    """Run an awaitable factory with exponential backoff on transient failure.
+
+    `factory` is re-invoked per attempt (so it may rebuild clients/threads).
+    Re-raises the last exception once attempts are exhausted.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            return await factory()
+        except Exception as exc:
+            if attempt >= attempts:
+                raise
+            log.warning(
+                "ingest_op_retry",
+                op=label,
+                attempt=attempt,
+                max_attempts=attempts,
+                error=str(exc)[:300],
+            )
+            await asyncio.sleep(min(2 ** (attempt - 1), 8))
+
+
+class _IngestError(Exception):
+    """Carries the failing stage so it can be persisted with the error detail."""
+
+    def __init__(self, stage: str, detail: str) -> None:
+        super().__init__(detail)
+        self.stage = stage
+        self.detail = detail
+
+
+async def _download_source(storage_path: str, log: Any) -> bytes:
+    async def _attempt() -> bytes:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp: httpx.Response = await client.get(
+                f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
+                headers=supabase_admin_headers(),
+            )
+        if resp.status_code >= 400:
+            raise RuntimeError(f"storage download {resp.status_code}: {resp.text[:200]}")
+        return resp.content
+
+    try:
+        result: bytes = await _with_retry(_attempt, label="download", log=log)
+        return result
+    except Exception as exc:
+        raise _IngestError("downloading", str(exc)) from exc
 
 
 async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage_path: str) -> None:
     log = get_logger().bind(doc_id=doc_id, user_id=user_id, filename=filename)
     log.info("ingest_started")
     start = time.perf_counter()
-    async with httpx.AsyncClient(timeout=30) as client:
-        download_resp: httpx.Response = await client.get(
-            f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
-            headers=supabase_admin_headers(),
-        )
-        if download_resp.status_code >= 400:
-            log.error(
-                "ingest_storage_download_failed",
-                storage_path=storage_path,
-                status=download_resp.status_code,
-                body=download_resp.text[:500],
-            )
-            async for session in get_db():
-                await update_document_status(session, doc_id, "failed")
-            return
-
-        file_bytes: bytes = download_resp.content
-
-    tmp_path: PosixPath = PosixPath(f"/tmp/pilot_{doc_id}{PosixPath(filename).suffix.lower()}")
-    tmp_path.write_bytes(file_bytes)
+    tmp_path: PosixPath | None = None
 
     try:
-        pages: list[Page] = extract_text(str(tmp_path))
+        # 1. Download source (transient — retried).
+        await _set_doc_stage(doc_id, "processing", stage="downloading")
+        file_bytes: bytes = await _download_source(storage_path, log)
+
+        suffix = PosixPath(filename).suffix.lower()
+        fd, tmp_name = tempfile.mkstemp(prefix=f"pilot_{doc_id}_", suffix=suffix)
+        tmp_path = PosixPath(tmp_name)
+        with open(fd, "wb") as fh:
+            fh.write(file_bytes)
+
+        # 2. Extract text/OCR (deterministic — not retried, runs off the event loop).
+        await _set_doc_stage(doc_id, "processing", stage="extracting")
+        try:
+            pages: list[Page] = await asyncio.to_thread(extract_text, str(tmp_path))
+        except Exception as exc:
+            raise _IngestError("extracting", f"text extraction failed: {exc}") from exc
         log.info("ingest_extracted", page_count=len(pages))
         if not pages:
             log.warning("ingest_no_text_extracted", size_bytes=len(file_bytes))
 
+        # 3. Chunk.
+        await _set_doc_stage(doc_id, "processing", stage="chunking")
         chunks: list[Chunk] = chunk_pages(pages)
         log.info("ingest_chunked", chunk_count=len(chunks))
+        if not chunks:
+            raise _IngestError("chunking", "no extractable text — document is empty or image-only")
 
+        # 4. Embed (transient — retried, runs off the event loop).
+        await _set_doc_stage(doc_id, "processing", stage="embedding")
         texts: list[str] = [c.text for c in chunks]
-        embedding: list[list[float]] = embed_documents(texts)
+        try:
+            embedding: list[list[float]] = await _with_retry(
+                lambda: asyncio.to_thread(embed_documents, texts),
+                label="embed",
+                log=log,
+            )
+        except Exception as exc:
+            raise _IngestError("embedding", f"embedding failed: {exc}") from exc
         log.info("ingest_embedded", embedding_count=len(embedding))
 
         for chunk, emb in zip(chunks, embedding):
             chunk.embedding = emb
 
-        async for session in get_db():
-            await insert_chunks(session, user_id, doc_id, chunks)
-            await update_document_status(session, doc_id, "ready")
+        # 5. Persist chunks and mark ready.
+        await _set_doc_stage(doc_id, "processing", stage="storing")
+        try:
+            async for session in get_db():
+                await insert_chunks(session, user_id, doc_id, chunks)
+                await update_document_status(session, doc_id, "ready")
+        except Exception as exc:
+            raise _IngestError("storing", f"persisting chunks failed: {exc}") from exc
 
         log.info(
             "ingest_completed",
@@ -356,16 +458,23 @@ async def _run_ingest_pipeline(doc_id: str, user_id: str, filename: str, storage
             duration_ms=round((time.perf_counter() - start) * 1000, 2),
         )
 
-    except Exception:
-        log.exception(
+    except _IngestError as exc:
+        log.error(
             "ingest_failed",
+            stage=exc.stage,
+            error=exc.detail[:500],
             duration_ms=round((time.perf_counter() - start) * 1000, 2),
         )
-        async for session in get_db():
-            await update_document_status(session, doc_id, "failed")
-        return
+        await _set_doc_stage(doc_id, "failed", stage=exc.stage, error_detail=exc.detail)
+    except Exception as exc:
+        log.exception(
+            "ingest_failed_unexpected",
+            duration_ms=round((time.perf_counter() - start) * 1000, 2),
+        )
+        await _set_doc_stage(doc_id, "failed", error_detail=f"unexpected error: {exc}")
     finally:
-        tmp_path.unlink(missing_ok=True)
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
 
 @app.post("/ingest", status_code=202)
@@ -574,7 +683,7 @@ async def submit_feedback(
                 raise HTTPException(status_code=400, detail="Feedback references unknown chunks")
 
         fid: str = str(_uuid.uuid4())
-        now: datetime = datetime.now(tz=datetime.timezone.utc)
+        now: datetime = datetime.now(tz=timezone.utc)
         stmt = text("""
             INSERT INTO feedback (
                 id, user_id, query, answer, rating, retrieved_chunk_ids, created_at

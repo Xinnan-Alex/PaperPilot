@@ -97,9 +97,17 @@ export async function ingestDocument(
   });
 }
 
-export async function listDocuments(): Promise<
-  Array<{ id: string; filename: string; status: string; created_at: string }>
-> {
+export interface DocumentSummary {
+  id: string;
+  filename: string;
+  status: string;
+  stage?: string | null;
+  error_detail?: string | null;
+  retry_count?: number;
+  created_at: string;
+}
+
+export async function listDocuments(): Promise<DocumentSummary[]> {
   return apiFetch("/documents");
 }
 
