@@ -355,6 +355,22 @@ paperpilot/
 2. Set all `sync: false` environment variables in the Render Dashboard.
 3. Health check: `/health` on port `10000`.
 
+#### Keep-warm (avoiding cold starts)
+
+Render's free tier spins the container down after **15 minutes** of inactivity; the next request then eats a ~30–60s cold start. To keep it warm, an external uptime monitor pings `/health` on a fixed interval.
+
+We use [cron-job.org](https://cron-job.org) (free, honours the interval):
+
+1. Sign up and verify your email.
+2. **Create cronjob** → **Title:** `paperpilot keep-warm`.
+3. **URL:** `https://<your-render-url>/health`
+4. **Request method:** GET.
+5. **Schedule:** every 10 minutes (stay under the 15-min idle window).
+6. **Expected status:** 200 (enables failure alerts).
+7. Save, enable, and use **Test run** to confirm a 200.
+
+> Permanent fix without any pinger: upgrade Render to the **Starter** tier ($7/mo), which has no spin-down.
+
 ### Database (Supabase)
 
 - Migrations in `supabase/migrations/` are automatically pushed to production on every merge to `main` via GitHub Actions.
