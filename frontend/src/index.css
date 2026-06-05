@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @source "../node_modules/streamdown/dist/*.js";
 
+/* next-themes toggles a `.dark` class on <html>; without this, Tailwind v4's
+   `dark:` utilities default to the prefers-color-scheme media query (OS), not
+   the app theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Base colors - neutral only, no accent colors */
   --color-background: #ffffff;
