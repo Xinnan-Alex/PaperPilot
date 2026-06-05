@@ -80,7 +80,7 @@ The agent's `search_documents` tool runs a fuller pipeline: query rewrite (multi
 
 ### Chat sessions
 
-Stored directly in Supabase `chat_sessions` table (`id, user_id, title, messages jsonb, doc_ids uuid[]`) via the frontend JS client — **no backend routes for sessions**. `useChatSessions.ts` hook manages state: message writes are debounced 1.5s (avoid per-token DB writes during streaming); doc changes and deletes are immediate.
+Stored directly in Supabase `chat_sessions` table (`id, user_id, title, messages jsonb, doc_ids uuid[]`) via the frontend JS client — **no backend routes for sessions**. `useChatSessions.ts` hook manages state: message writes are debounced 1.5s (avoid per-token DB writes during streaming); doc changes and deletes are immediate. `ChatBox` caches `docId → filename` for attachment chips so labels stay visible after the picker closes or when reopening a session with existing `doc_ids`.
 
 ### Frontend structure
 

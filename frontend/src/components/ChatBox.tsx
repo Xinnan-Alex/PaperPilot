@@ -28,30 +28,6 @@ import {
 import { useSession } from "@/hooks/useSession";
 import MarkdownContent from "./MarkdownContent";
 
-function renderSourceText(src: SSESource) {
-  const { text } = src;
-  const start = src.span_start;
-  const end = src.span_end;
-  if (
-    start == null ||
-    end == null ||
-    start < 0 ||
-    end > text.length ||
-    start >= end
-  ) {
-    return text;
-  }
-  return (
-    <>
-      {text.slice(0, start)}
-      <mark className="rounded-sm bg-primary/20 px-0.5 text-foreground">
-        {text.slice(start, end)}
-      </mark>
-      {text.slice(end)}
-    </>
-  );
-}
-
 interface AvailableDoc {
   id: string;
   filename: string;
@@ -129,6 +105,7 @@ export default function ChatBox({
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
   const [availableDocs, setAvailableDocs] = useState<AvailableDoc[]>([]);
+  const [docNameById, setDocNameById] = useState<Record<string, string>>({});
   const [loadingDocs, setLoadingDocs] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -325,27 +302,90 @@ export default function ChatBox({
     }
   }, [input]);
 
+  const mergeDocNames = useCallback((docs: AvailableDoc[]) => {
+    setDocNameById((prev) => {
+      const next = { ...prev };
+      for (const doc of docs) {
+        if (doc.status === "ready") next[doc.id] = doc.filename;
+      }
+      return next;
+    });
+  }, []);
+
+  // Latest values read inside effects without retriggering them.
+  const docNameByIdRef = useRef(docNameById);
+  useEffect(() => {
+    docNameByIdRef.current = docNameById;
+  }, [docNameById]);
+  const showDocPickerRef = useRef(showDocPicker);
+  useEffect(() => {
+    showDocPickerRef.current = showDocPicker;
+  }, [showDocPicker]);
+
   const loadAvailableDocs = useCallback(async () => {
     setLoadingDocs(true);
     try {
       const data = await listDocuments();
-      setAvailableDocs(data.filter((d) => d.status === "ready"));
+      const ready = data.filter((d) => d.status === "ready");
+      setAvailableDocs(ready);
+      mergeDocNames(ready);
     } catch {
       toast.error("Failed to load documents");
     } finally {
       setLoadingDocs(false);
     }
-  }, []);
+  }, [mergeDocNames]);
+
+  const lastHydratedKey = useRef("");
+  useEffect(() => {
+    if (docIds.length === 0) return;
+    if (docIds.every((id) => docNameByIdRef.current[id])) return;
+
+    // Guard against refetching the same doc set repeatedly when an id never
+    // resolves (e.g. a deleted doc still in scope) — its name stays unset, so
+    // the every() check above can't short-circuit on later renders.
+    const key = docIds.join(",");
+    if (lastHydratedKey.current === key) return;
+    lastHydratedKey.current = key;
+
+    let cancelled = false;
+    listDocuments()
+      .then((data) => {
+        if (cancelled) return;
+        mergeDocNames(data.filter((d) => d.status === "ready"));
+      })
+      .catch(() => {
+        // Allow a retry for this doc set if the fetch failed.
+        lastHydratedKey.current = "";
+        // loadAvailableDocs surfaces errors when the picker is open
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docIds, mergeDocNames]);
 
   useEffect(() => {
     if (docsVersion === undefined || docsVersion === 0) return;
-    if (showDocPicker) {
-      loadAvailableDocs();
-    } else {
-      // Clear stale list so next open fetches fresh
-      setAvailableDocs([]);
-    }
-  }, [docsVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    let cancelled = false;
+    listDocuments()
+      .then((data) => {
+        if (cancelled) return;
+        const ready = data.filter((d) => d.status === "ready");
+        mergeDocNames(ready);
+        if (showDocPickerRef.current) setAvailableDocs(ready);
+      })
+      .catch(() => {
+        if (!cancelled && showDocPickerRef.current) {
+          toast.error("Failed to load documents");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docsVersion, mergeDocNames]);
 
   const toggleDocPicker = () => {
     if (!showDocPicker) loadAvailableDocs();
@@ -356,13 +396,11 @@ export default function ChatBox({
     if (docIds.includes(id)) {
       onDocIdsChange(docIds.filter((d) => d !== id));
     } else {
+      const doc = availableDocs.find((d) => d.id === id);
+      if (doc) mergeDocNames([doc]);
       onDocIdsChange([...docIds, id]);
     }
   };
-
-  const attachedDocNames = availableDocs
-    .filter((d) => docIds.includes(d.id))
-    .map((d) => d.filename);
 
   const lastAssistantMsg = [...messages]
     .reverse()
@@ -410,7 +448,7 @@ export default function ChatBox({
                   Page: {src.page ?? "N/A"}
                 </p>
                 <p className="mt-1 line-clamp-3 text-muted-foreground">
-                  {renderSourceText(src)}
+                  {src.text}
                 </p>
               </div>
             ))}
@@ -459,22 +497,26 @@ export default function ChatBox({
         {/* Attached doc chips */}
         {docIds.length > 0 && !showDocPicker && (
           <div className="flex flex-wrap gap-1.5 px-4 pt-3">
-            {attachedDocNames.map((name, i) => (
-              <span
-                key={docIds[i]}
-                className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
-              >
-                <FileText className="h-3 w-3 text-muted-foreground" />
-                {name}
-                <button
-                  onClick={() => toggleDoc(docIds[i])}
-                  className="ml-0.5 text-muted-foreground hover:text-foreground"
-                  aria-label={`Remove ${name}`}
+            {docIds.map((id) => {
+              const name = docNameById[id] ?? "Document";
+              return (
+                <span
+                  key={id}
+                  className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+                  <FileText className="h-3 w-3 text-muted-foreground" />
+                  {name}
+                  <button
+                    type="button"
+                    onClick={() => toggleDoc(id)}
+                    className="ml-0.5 text-muted-foreground hover:text-foreground"
+                    aria-label={`Remove ${name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
 
