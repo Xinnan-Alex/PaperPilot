@@ -37,5 +37,8 @@ jobs:
 
       # --diff scans only files changed vs the PR base, so existing debt never
       # blocks a PR while newly introduced issues are caught before merge.
+      # Use npx, not `pnpm dlx`: dlx would apply this workspace's pnpm
+      # supply-chain policy (trustPolicy/minimumReleaseAge) to react-doctor's
+      # OWN transitive deps and fail. The tool isn't a project dependency.
       - name: Scan changed files
-        run: pnpm dlx react-doctor@latest --verbose --diff
+        run: npx --yes react-doctor@latest --verbose --diff
