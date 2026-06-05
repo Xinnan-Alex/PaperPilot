@@ -6,10 +6,18 @@ import {
   FileUp,
   LogOut,
   MessageSquare,
+  MoreHorizontal,
   Trash2,
   X,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
 import { ThemeToggle } from "./ThemeToggle";
 import { BrandMark } from "./BrandMark";
@@ -36,6 +44,33 @@ interface SidebarProps {
 const handleSignOut = async () => {
   await supabase.auth.signOut();
 };
+
+// Collapsible account menu — Sign out today, room for Settings etc. later.
+// `trigger` is the clickable element; placement adapts to the sidebar mode.
+function AccountMenu({
+  trigger,
+  side = "top",
+  align = "end",
+}: {
+  trigger: ReactNode;
+  side?: "top" | "right";
+  align?: "start" | "end";
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent side={side} align={align} className="w-48">
+        <DropdownMenuItem
+          onSelect={handleSignOut}
+          className="text-muted-foreground"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function Sidebar({
   sessions,
@@ -108,15 +143,24 @@ export default function Sidebar({
         >
           <PanelLeft className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground"
-          onClick={handleSignOut}
-          aria-label="Sign out"
-        >
-          <LogOut className="h-4 w-4" />
-        </Button>
+        <AccountMenu
+          side="right"
+          align="end"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Account menu"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
+                <span className="text-[10px] font-medium">
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            </Button>
+          }
+        />
       </div>
     </div>
   );
@@ -220,7 +264,7 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="border-t border-border p-3">
-        <div className="flex items-center gap-2 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted">
             <span className="text-xs font-medium">
               {displayName.charAt(0).toUpperCase()}
@@ -229,15 +273,21 @@ export default function Sidebar({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{displayName}</p>
           </div>
+          <AccountMenu
+            side="top"
+            align="end"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground"
+                aria-label="Account menu"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            }
+          />
         </div>
-        <Button
-          variant="ghost"
-          className="mt-1 w-full justify-start gap-2 text-sm font-normal text-muted-foreground"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Button>
       </div>
     </div>
   );
