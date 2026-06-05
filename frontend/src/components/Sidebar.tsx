@@ -12,6 +12,7 @@ import {
 import { Button } from "./ui/button";
 import { useSession } from "@/hooks/useSession";
 import { ThemeToggle } from "./ThemeToggle";
+import { BrandMark } from "./BrandMark";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import type { ChatSession } from "@/hooks/useChatSessions";
@@ -74,9 +75,7 @@ export default function Sidebar({
   const compactSidebarBody = (
     <div className="flex h-full w-full flex-col items-center bg-sidebar-background py-4">
       <div className="mb-6 flex items-center justify-center">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background font-bold text-sm">
-          P
-        </div>
+        <BrandMark className="h-8 w-8" />
       </div>
       <nav className="flex flex-1 flex-col items-center gap-2">
         <Button
@@ -127,10 +126,8 @@ export default function Sidebar({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background font-bold text-sm">
-            P
-          </div>
-          <span className="text-base font-semibold">PaperPilot</span>
+          <BrandMark className="h-8 w-8" />
+          <span className="text-lg font-semibold tracking-tight">PaperPilot</span>
         </div>
         <div className="flex items-center gap-1">
           <ThemeToggle />

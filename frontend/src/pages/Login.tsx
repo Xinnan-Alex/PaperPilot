@@ -13,18 +13,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
-import { useTheme } from "next-themes";
+import { useThemeTransition } from "@/hooks/useThemeTransition";
+import { BrandMark } from "@/components/BrandMark";
 
 const REPO_URL = "https://github.com/Xinnan-Alex/PaperPilot";
 
 type ThemeName = "light" | "dark";
-type ViewTransitionHandle = {
-  ready: Promise<void>;
-  finished: Promise<void>;
-};
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => ViewTransitionHandle;
-};
 
 const GitHubMark = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -54,86 +48,19 @@ const GoogleMark = ({ className }: { className?: string }) => (
 );
 
 function ThemeIcon() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { isDark, animating, setAnimating, applyTheme, revealTheme } =
+    useThemeTransition();
   const ref = useRef<HTMLButtonElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const animationsRef = useRef<Animation[]>([]);
-  const [animating, setAnimating] = useState(false);
-  const isDark = resolvedTheme === "dark";
 
   useEffect(() => {
     return () => {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
-      animationsRef.current.forEach((animation) => animation.cancel());
-      animationsRef.current = [];
     };
   }, []);
 
-  const applyTheme = useCallback(
-    (nextTheme: ThemeName) => {
-      document.documentElement.classList.toggle("dark", nextTheme === "dark");
-      document.documentElement.style.colorScheme = nextTheme;
-      setTheme(nextTheme);
-    },
-    [setTheme]
-  );
-
-  const revealTheme = useCallback(
-    async (x: number, y: number, nextTheme: ThemeName) => {
-      const maxX = Math.max(x, window.innerWidth - x);
-      const maxY = Math.max(y, window.innerHeight - y);
-      const radius = Math.hypot(maxX, maxY);
-      const clipPath = [
-        `circle(0px at ${x}px ${y}px)`,
-        `circle(${radius}px at ${x}px ${y}px)`,
-      ];
-      const documentWithTransition = document as ViewTransitionDocument;
-
-      if (documentWithTransition.startViewTransition) {
-        const transition = documentWithTransition.startViewTransition(() => applyTheme(nextTheme));
-        await transition.ready.catch(() => undefined);
-        const animation = document.documentElement.animate(
-          { clipPath },
-          {
-            duration: 720,
-            easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-            pseudoElement: "::view-transition-new(root)",
-          } as KeyframeAnimationOptions
-        );
-        animationsRef.current.push(animation);
-        await animation.finished.catch(() => undefined);
-        await transition.finished.catch(() => undefined);
-        return;
-      }
-
-      const overlay = document.createElement("div");
-      overlay.setAttribute("aria-hidden", "true");
-      Object.assign(overlay.style, {
-        position: "fixed",
-        inset: "0",
-        zIndex: "50",
-        pointerEvents: "none",
-        background: nextTheme === "dark" ? "#191919" : "#ffffff",
-        clipPath: clipPath[0],
-      });
-      document.body.appendChild(overlay);
-      const animation = overlay.animate(
-        { clipPath },
-        {
-          duration: 720,
-          easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-          fill: "forwards",
-        }
-      );
-      animationsRef.current.push(animation);
-      await animation.finished.catch(() => undefined);
-      applyTheme(nextTheme);
-      overlay.remove();
-    },
-    [applyTheme]
-  );
-
+  // Landing flourish: wiggle for 1s, then run the shared circular reveal.
   const handleClick = useCallback(() => {
     if (animating) return;
     const nextTheme: ThemeName = isDark ? "light" : "dark";
@@ -155,7 +82,7 @@ function ThemeIcon() {
         setAnimating(false);
       });
     }, 1000));
-  }, [animating, applyTheme, isDark, revealTheme]);
+  }, [animating, applyTheme, isDark, revealTheme, setAnimating]);
 
   return (
     <>
@@ -229,23 +156,25 @@ export default function Login() {
       {/* ---------- Header ---------- */}
       <header className="relative z-10 flex items-center justify-between px-5 py-5 sm:px-8">
         <div className="l-rise flex items-center gap-2.5">
-          <ThemeIcon />
+          <BrandMark landing className="h-9 w-9" />
           <span className="text-lg font-semibold tracking-tight">
             PaperPilot
           </span>
         </div>
 
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="l-surface l-rise flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium"
-          style={{ "--d": "0.06s" } as CSSProperties}
-          aria-label="View source code on GitHub"
-        >
-          <GitHubMark className="h-4 w-4" />
-          <span className="hidden sm:inline">Source</span>
-        </a>
+        <div className="l-rise flex items-center gap-2" style={{ "--d": "0.06s" } as CSSProperties}>
+          <ThemeIcon />
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="l-surface flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium"
+            aria-label="View source code on GitHub"
+          >
+            <GitHubMark className="h-4 w-4" />
+            <span className="hidden sm:inline">Source</span>
+          </a>
+        </div>
       </header>
 
       {/* ---------- Hero ---------- */}
@@ -286,7 +215,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowProviders(true)}
-                  className="l-cta group flex h-13 w-full items-center justify-center gap-2 rounded-2xl px-6 text-base font-semibold"
+                  className="l-cta group flex h-13 w-full items-center justify-center gap-2 rounded-lg px-6 text-base font-semibold"
                 >
                   Sign in
                   <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
@@ -301,7 +230,7 @@ export default function Login() {
                   type="button"
                   onClick={() => signIn("github")}
                   disabled={loading !== null}
-                  className="l-surface l-pop flex h-13 w-full items-center justify-center gap-2.5 rounded-2xl px-6 text-base font-semibold"
+                  className="l-surface l-pop flex h-13 w-full items-center justify-center gap-2.5 rounded-lg px-6 text-base font-semibold"
                 >
                   {loading === "github" ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -314,7 +243,7 @@ export default function Login() {
                   type="button"
                   onClick={() => signIn("google")}
                   disabled={loading !== null}
-                  className="l-surface l-pop flex h-13 w-full items-center justify-center gap-2.5 rounded-2xl px-6 text-base font-semibold"
+                  className="l-surface l-pop flex h-13 w-full items-center justify-center gap-2.5 rounded-lg px-6 text-base font-semibold"
                   style={{ "--d": "0.06s" } as CSSProperties}
                 >
                   {loading === "google" ? (

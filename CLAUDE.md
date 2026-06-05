@@ -86,8 +86,8 @@ Stored directly in Supabase `chat_sessions` table (`id, user_id, title, messages
 ### Frontend structure
 
 - `pages/` — `AppPage.tsx`, `Login.tsx`
-- `components/` — `ChatBox.tsx`, `Sidebar.tsx`, `UploadBox.tsx`, `ThemeToggle.tsx`, `ThemeProvider.tsx`, `MarkdownContent.tsx` (Streamdown wrapper), `ErrorBoundary.tsx`, `ToolCallBubble.tsx`, `ModelPicker.tsx`
-- `hooks/` — `useSession.ts` (Supabase auth), `useChatSessions.ts` (chat state), `useModels.ts`
+- `components/` — `ChatBox.tsx`, `Sidebar.tsx`, `UploadBox.tsx`, `ThemeToggle.tsx`, `ThemeProvider.tsx`, `BrandMark.tsx` (shared paper-plane logo), `MarkdownContent.tsx` (Streamdown wrapper), `ErrorBoundary.tsx`, `ToolCallBubble.tsx`, `ModelPicker.tsx`
+- `hooks/` — `useSession.ts` (Supabase auth), `useChatSessions.ts` (chat state), `useModels.ts`, `useThemeTransition.ts` (shared circular theme-switch reveal, used by both theme toggles)
 - `lib/` — API client (typed fetch with auth header), Supabase JS client init, `remarkCitations.ts` remark plugin (`[N]` → `<citation-marker>`), utils
 
 ### Frontend design system
