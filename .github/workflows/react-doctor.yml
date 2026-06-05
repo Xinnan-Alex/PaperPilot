@@ -18,7 +18,13 @@ jobs:
           # Full history so --diff can resolve the PR base branch.
           fetch-depth: 0
 
+      # pnpm 11 — required for the supply-chain settings in pnpm-workspace.yaml
+      # (minimumReleaseAge, trustPolicy) and the pnpm-11-generated lockfile.
+      # Pinned here because there's no root package.json / packageManager field
+      # for the action to infer the version from.
       - uses: pnpm/action-setup@v4
+        with:
+          version: 11
 
       - uses: actions/setup-node@v4
         with:
