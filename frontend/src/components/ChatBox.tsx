@@ -312,6 +312,16 @@ export default function ChatBox({
     });
   }, []);
 
+  // Latest values read inside effects without retriggering them.
+  const docNameByIdRef = useRef(docNameById);
+  useEffect(() => {
+    docNameByIdRef.current = docNameById;
+  }, [docNameById]);
+  const showDocPickerRef = useRef(showDocPicker);
+  useEffect(() => {
+    showDocPickerRef.current = showDocPicker;
+  }, [showDocPicker]);
+
   const loadAvailableDocs = useCallback(async () => {
     setLoadingDocs(true);
     try {
@@ -326,9 +336,17 @@ export default function ChatBox({
     }
   }, [mergeDocNames]);
 
+  const lastHydratedKey = useRef("");
   useEffect(() => {
     if (docIds.length === 0) return;
-    if (docIds.every((id) => docNameById[id])) return;
+    if (docIds.every((id) => docNameByIdRef.current[id])) return;
+
+    // Guard against refetching the same doc set repeatedly when an id never
+    // resolves (e.g. a deleted doc still in scope) — its name stays unset, so
+    // the every() check above can't short-circuit on later renders.
+    const key = docIds.join(",");
+    if (lastHydratedKey.current === key) return;
+    lastHydratedKey.current = key;
 
     let cancelled = false;
     listDocuments()
@@ -337,13 +355,15 @@ export default function ChatBox({
         mergeDocNames(data.filter((d) => d.status === "ready"));
       })
       .catch(() => {
+        // Allow a retry for this doc set if the fetch failed.
+        lastHydratedKey.current = "";
         // loadAvailableDocs surfaces errors when the picker is open
       });
 
     return () => {
       cancelled = true;
     };
-  }, [docIds, docNameById, mergeDocNames]);
+  }, [docIds, mergeDocNames]);
 
   useEffect(() => {
     if (docsVersion === undefined || docsVersion === 0) return;
@@ -354,10 +374,10 @@ export default function ChatBox({
         if (cancelled) return;
         const ready = data.filter((d) => d.status === "ready");
         mergeDocNames(ready);
-        if (showDocPicker) setAvailableDocs(ready);
+        if (showDocPickerRef.current) setAvailableDocs(ready);
       })
       .catch(() => {
-        if (!cancelled && showDocPicker) {
+        if (!cancelled && showDocPickerRef.current) {
           toast.error("Failed to load documents");
         }
       });
@@ -365,7 +385,7 @@ export default function ChatBox({
     return () => {
       cancelled = true;
     };
-  }, [docsVersion, showDocPicker, mergeDocNames]);
+  }, [docsVersion, mergeDocNames]);
 
   const toggleDocPicker = () => {
     if (!showDocPicker) loadAvailableDocs();
