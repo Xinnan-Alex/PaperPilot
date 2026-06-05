@@ -38,6 +38,8 @@ class ModelSpec(BaseModel):
     api_key_env: str
     enabled: bool = True
     default: bool = False
+    retrieval_top_k: int | None = None
+    retrieval_context_chars: int | None = None
 
 
 class _ModelManifestEntry(BaseModel):
@@ -48,6 +50,8 @@ class _ModelManifestEntry(BaseModel):
     context_window: int
     enabled: bool = True
     default: bool = False
+    retrieval_top_k: int | None = None
+    retrieval_context_chars: int | None = None
 
 
 class _ProviderManifestEntry(BaseModel):
@@ -92,6 +96,8 @@ def _load_manifest(path: Path) -> tuple[dict[str, ProviderSpec], list[ModelSpec]
                     api_key_env=pcfg.api_key_env,
                     enabled=m.enabled,
                     default=m.default,
+                    retrieval_top_k=m.retrieval_top_k,
+                    retrieval_context_chars=m.retrieval_context_chars,
                 )
             )
 
@@ -131,3 +137,12 @@ def resolve(model_id: str) -> ModelSpec:
         if m.id == model_id:
             return m
     raise HTTPException(status_code=404, detail=f"Model '{model_id}' is not available")
+
+
+def retrieval_budget(spec: ModelSpec | None) -> tuple[int, int]:
+    """(top_k, context_chars) — per-model override or global default."""
+    if spec is None:
+        return settings.retrieval_top_k, settings.retrieval_context_chars
+    top_k = spec.retrieval_top_k or settings.retrieval_top_k
+    ctx = spec.retrieval_context_chars or settings.retrieval_context_chars
+    return top_k, ctx

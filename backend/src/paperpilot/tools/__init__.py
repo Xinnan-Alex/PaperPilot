@@ -24,6 +24,7 @@ class ToolContext:
     access_token: str
     doc_ids: list[str] | None
     db_session: Any  # AsyncSession at runtime; Any to avoid import cycle in tests
+    model: Any = None  # resolved ModelSpec; Any to avoid import cycle
 
 
 REGISTRY: dict[str, ToolSpec] = {}

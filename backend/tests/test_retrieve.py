@@ -68,3 +68,52 @@ async def test_keyword_search_uses_postgres_full_text_search(
     assert session.params["k"] == 7
     if doc_ids is not None:
         assert session.params["doc_ids"] == doc_ids
+
+
+async def test_multi_query_search_fuses_and_ranks(monkeypatch: pytest.MonkeyPatch) -> None:
+    from paperpilot import retrieve
+
+    async def fake_hybrid(
+        session: Any,
+        user_id: str,
+        query: str,
+        query_embedding: list[float],
+        k: int = 5,
+        doc_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        if query == "q1":
+            return [{"id": "c-1", "text": "a"}, {"id": "c-2", "text": "b"}]
+        return [{"id": "c-2", "text": "b"}, {"id": "c-3", "text": "c"}]
+
+    monkeypatch.setattr(retrieve, "hybrid_search", fake_hybrid)
+    rows = await retrieve.multi_query_search(
+        cast(AsyncSession, object()),
+        "u-1",
+        ["q1", "q2"],
+        [[0.0], [0.0]],
+        pool=10,
+    )
+    ids = [r["id"] for r in rows]
+    assert ids[0] == "c-2"
+    assert set(ids) == {"c-1", "c-2", "c-3"}
+    assert len(ids) == 3
+
+
+async def test_multi_query_search_respects_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    from paperpilot import retrieve
+
+    async def fake_hybrid(
+        session: Any,
+        user_id: str,
+        query: str,
+        query_embedding: list[float],
+        k: int = 5,
+        doc_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        return [{"id": f"c-{i}", "text": "x"} for i in range(5)]
+
+    monkeypatch.setattr(retrieve, "hybrid_search", fake_hybrid)
+    rows = await retrieve.multi_query_search(
+        cast(AsyncSession, object()), "u-1", ["q1"], [[0.0]], pool=3
+    )
+    assert len(rows) == 3

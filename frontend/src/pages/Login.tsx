@@ -17,6 +17,15 @@ import { useTheme } from "next-themes";
 
 const REPO_URL = "https://github.com/Xinnan-Alex/PaperPilot";
 
+type ThemeName = "light" | "dark";
+type ViewTransitionHandle = {
+  ready: Promise<void>;
+  finished: Promise<void>;
+};
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => ViewTransitionHandle;
+};
+
 const GitHubMark = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
@@ -45,25 +54,91 @@ const GoogleMark = ({ className }: { className?: string }) => (
 );
 
 function ThemeIcon() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const ref = useRef<HTMLButtonElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const animationsRef = useRef<Animation[]>([]);
   const [animating, setAnimating] = useState(false);
-  const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
-  const [flipping, setFlipping] = useState(false);
-  const isDark = theme === "dark";
+  const isDark = resolvedTheme === "dark";
 
   useEffect(() => {
     return () => {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
+      animationsRef.current.forEach((animation) => animation.cancel());
+      animationsRef.current = [];
     };
   }, []);
 
+  const applyTheme = useCallback(
+    (nextTheme: ThemeName) => {
+      document.documentElement.classList.toggle("dark", nextTheme === "dark");
+      document.documentElement.style.colorScheme = nextTheme;
+      setTheme(nextTheme);
+    },
+    [setTheme]
+  );
+
+  const revealTheme = useCallback(
+    async (x: number, y: number, nextTheme: ThemeName) => {
+      const maxX = Math.max(x, window.innerWidth - x);
+      const maxY = Math.max(y, window.innerHeight - y);
+      const radius = Math.hypot(maxX, maxY);
+      const clipPath = [
+        `circle(0px at ${x}px ${y}px)`,
+        `circle(${radius}px at ${x}px ${y}px)`,
+      ];
+      const documentWithTransition = document as ViewTransitionDocument;
+
+      if (documentWithTransition.startViewTransition) {
+        const transition = documentWithTransition.startViewTransition(() => applyTheme(nextTheme));
+        await transition.ready.catch(() => undefined);
+        const animation = document.documentElement.animate(
+          { clipPath },
+          {
+            duration: 720,
+            easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+            pseudoElement: "::view-transition-new(root)",
+          } as KeyframeAnimationOptions
+        );
+        animationsRef.current.push(animation);
+        await animation.finished.catch(() => undefined);
+        await transition.finished.catch(() => undefined);
+        return;
+      }
+
+      const overlay = document.createElement("div");
+      overlay.setAttribute("aria-hidden", "true");
+      Object.assign(overlay.style, {
+        position: "fixed",
+        inset: "0",
+        zIndex: "50",
+        pointerEvents: "none",
+        background: nextTheme === "dark" ? "#191919" : "#ffffff",
+        clipPath: clipPath[0],
+      });
+      document.body.appendChild(overlay);
+      const animation = overlay.animate(
+        { clipPath },
+        {
+          duration: 720,
+          easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+          fill: "forwards",
+        }
+      );
+      animationsRef.current.push(animation);
+      await animation.finished.catch(() => undefined);
+      applyTheme(nextTheme);
+      overlay.remove();
+    },
+    [applyTheme]
+  );
+
   const handleClick = useCallback(() => {
     if (animating) return;
+    const nextTheme: ThemeName = isDark ? "light" : "dark";
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setTheme(isDark ? "light" : "dark");
+      applyTheme(nextTheme);
       return;
     }
 
@@ -74,19 +149,13 @@ function ThemeIcon() {
     const cy = rect.top + rect.height / 2;
 
     setAnimating(true);
-    setFlipping(true);
-    setRipple({ x: cx, y: cy });
 
     timersRef.current.push(setTimeout(() => {
-      setTheme(isDark ? "light" : "dark");
-    }, 280));
-
-    timersRef.current.push(setTimeout(() => {
-      setRipple(null);
-      setFlipping(false);
-      setAnimating(false);
-    }, 850));
-  }, [animating, isDark, setTheme]);
+      void revealTheme(cx, cy, nextTheme).finally(() => {
+        setAnimating(false);
+      });
+    }, 1000));
+  }, [animating, applyTheme, isDark, revealTheme]);
 
   return (
     <>
@@ -96,28 +165,10 @@ function ThemeIcon() {
         onClick={handleClick}
         disabled={animating}
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${flipping ? (isDark ? "animate-[backflip-reverse_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]" : "animate-[backflip_0.5s_cubic-bezier(0.34,1.56,0.64,1)_forwards]") : ""}`}
-        style={flipping ? { backfaceVisibility: "hidden" as const } : undefined}
+        className={`grid h-9 w-9 place-items-center rounded-lg bg-[color:var(--btn)] text-[color:var(--btn-ink)] shadow-sm transition-shadow ${animating ? "theme-icon-hithere" : ""}`}
       >
-        <span className={flipping ? "animate-[fade-in_0.15s_ease_0.28s_both]" : ""}>
-          {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
-        </span>
+        {isDark ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
       </button>
-
-      {ripple && (
-        <div
-          aria-hidden={true}
-          className="pointer-events-none fixed z-50"
-          style={{
-            inset: 0,
-            "--ripple-x": `${ripple.x}px`,
-            "--ripple-y": `${ripple.y}px`,
-            clipPath: "circle(0% at var(--ripple-x) var(--ripple-y))",
-            animation: "ripple-expand 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards",
-            background: "var(--paper)",
-          } as React.CSSProperties}
-        />
-      )}
     </>
   );
 }

@@ -148,6 +148,8 @@ export interface SSESource {
   document_filename?: string;
   filename?: string;
   source_url?: string;
+  span_start?: number | null;
+  span_end?: number | null;
 }
 
 export interface ModelInfo {

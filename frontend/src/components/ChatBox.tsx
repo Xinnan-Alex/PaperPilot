@@ -10,7 +10,7 @@ import ModelPicker from "./ModelPicker";
 import ToolCallBubble, { type ToolCallState } from "./ToolCallBubble";
 import { useModels } from "./ModelProvider";
 import type { ChatMessage, MessagePart } from "@/hooks/useChatSessions";
-import { useRef, useState, useEffect, useCallback, useReducer } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import {
@@ -32,42 +32,6 @@ interface AvailableDoc {
   id: string;
   filename: string;
   status: string;
-}
-
-// The doc-picker popover is one cohesive state slice: its open flag, the docs
-// it fetched, and that fetch's loading state always move together.
-interface DocPickerState {
-  open: boolean;
-  docs: AvailableDoc[];
-  loading: boolean;
-}
-
-type DocPickerAction =
-  | { type: "toggle" }
-  | { type: "loadStart" }
-  | { type: "loaded"; docs: AvailableDoc[] }
-  | { type: "loadFailed" };
-
-const initialDocPicker: DocPickerState = {
-  open: false,
-  docs: [],
-  loading: false,
-};
-
-function docPickerReducer(
-  state: DocPickerState,
-  action: DocPickerAction,
-): DocPickerState {
-  switch (action.type) {
-    case "toggle":
-      return { ...state, open: !state.open };
-    case "loadStart":
-      return { ...state, loading: true };
-    case "loaded":
-      return { ...state, docs: action.docs, loading: false };
-    case "loadFailed":
-      return { ...state, loading: false };
-  }
 }
 
 function ThinkingBubble() {
@@ -115,23 +79,6 @@ function handleStreamEvent(event: StreamEvent, h: EventHandlers): void {
   }
 }
 
-// Stateless handlers — they close over nothing from the component, so they live
-// at module scope (one binding) instead of being rebuilt on every render.
-function handleSourceClick(chunkId: string): void {
-  const el = document.getElementById(`source-${chunkId}`);
-  el?.classList.add("ring-2", "ring-ring");
-  setTimeout(() => el?.classList.remove("ring-2", "ring-ring"), 2000);
-}
-
-async function handleOpenSource(src: SSESource): Promise<void> {
-  try {
-    const { url } = await getDocumentDownloadUrl(src.source_url ?? "");
-    window.open(url, "_blank", "noopener,noreferrer");
-  } catch {
-    toast.error("Could not open source document");
-  }
-}
-
 interface ChatBoxProps {
   chatId: string;
   messages: ChatMessage[];
@@ -155,19 +102,14 @@ export default function ChatBox({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [ratingLoading, setRatingLoading] = useState<string | null>(null);
+  const [showDocPicker, setShowDocPicker] = useState(false);
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
-  // Doc-picker slice grouped into a reducer (see docPickerReducer). The four
-  // values above are independent and stay as their own useState.
-  const [docPicker, dispatchDocPicker] = useReducer(
-    docPickerReducer,
-    initialDocPicker,
-  );
+  const [availableDocs, setAvailableDocs] = useState<AvailableDoc[]>([]);
+  const [docNameById, setDocNameById] = useState<Record<string, string>>({});
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Lazily initialised so the Map is built once, not re-allocated and discarded
-  // on every render (ChatBox re-renders on each streamed token).
-  const sourcesRef = useRef<Map<string, SSESource[]> | null>(null);
-  if (sourcesRef.current === null) sourcesRef.current = new Map();
+  const sourcesRef = useRef<Map<string, SSESource[]>>(new Map());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useSession();
 
@@ -183,6 +125,21 @@ export default function ChatBox({
         behavior: "smooth",
       });
     });
+  };
+
+  const handleSourceClick = (chunkId: string) => {
+    const el = document.getElementById(`source-${chunkId}`);
+    el?.classList.add("ring-2", "ring-ring");
+    setTimeout(() => el?.classList.remove("ring-2", "ring-ring"), 2000);
+  };
+
+  const handleOpenSource = async (src: SSESource) => {
+    try {
+      const { url } = await getDocumentDownloadUrl(src.source_url ?? "");
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast.error("Could not open source document");
+    }
   };
 
   const handleSend = async () => {
@@ -212,11 +169,9 @@ export default function ChatBox({
     onMessagesChange((prev) => [...prev, userMsg, assistantMsg]);
 
     const turn = [
-      ...messages.flatMap((m) =>
-        m.role === "user" || (m.content && m.content.trim())
-          ? [{ role: m.role, content: m.content }]
-          : [],
-      ),
+      ...messages
+        .filter((m) => m.role === "user" || (m.content && m.content.trim()))
+        .map((m) => ({ role: m.role, content: m.content })),
       { role: "user" as const, content: q },
     ];
 
@@ -282,7 +237,7 @@ export default function ChatBox({
           pushTool,
           updateTool,
           onSources: (sources) => {
-            sourcesRef.current?.set(assistantId, sources);
+            sourcesRef.current.set(assistantId, sources);
             updateAssistant((m) => ({ ...m, sources }));
           },
         });
@@ -307,7 +262,7 @@ export default function ChatBox({
   };
 
   const handleFeedback = async (msg: ChatMessage, rating: 1 | -1) => {
-    const sources = msg.sources || sourcesRef.current?.get(msg.id) || [];
+    const sources = msg.sources || sourcesRef.current.get(msg.id) || [];
     const chunksIds = sources.map((s) => s.chunk_id);
     setRatingLoading(msg.id);
     try {
@@ -347,42 +302,105 @@ export default function ChatBox({
     }
   }, [input]);
 
-  const loadAvailableDocs = useCallback(async () => {
-    dispatchDocPicker({ type: "loadStart" });
-    try {
-      const data = await listDocuments();
-      dispatchDocPicker({
-        type: "loaded",
-        docs: data.filter((d) => d.status === "ready"),
-      });
-    } catch {
-      toast.error("Failed to load documents");
-      dispatchDocPicker({ type: "loadFailed" });
-    }
+  const mergeDocNames = useCallback((docs: AvailableDoc[]) => {
+    setDocNameById((prev) => {
+      const next = { ...prev };
+      for (const doc of docs) {
+        if (doc.status === "ready") next[doc.id] = doc.filename;
+      }
+      return next;
+    });
   }, []);
 
-  // Fetch the document list whenever the picker is open — on first open and
-  // again if documents change elsewhere (docsVersion) while it's open. There's
-  // no stale cache to clear: a closed picker shows nothing, and opening always
-  // refetches. This replaces an effect that reset state on a prop change.
+  // Latest values read inside effects without retriggering them.
+  const docNameByIdRef = useRef(docNameById);
   useEffect(() => {
-    if (!docPicker.open) return;
-    loadAvailableDocs();
-  }, [docPicker.open, docsVersion, loadAvailableDocs]);
+    docNameByIdRef.current = docNameById;
+  }, [docNameById]);
+  const showDocPickerRef = useRef(showDocPicker);
+  useEffect(() => {
+    showDocPickerRef.current = showDocPicker;
+  }, [showDocPicker]);
 
-  const toggleDocPicker = () => dispatchDocPicker({ type: "toggle" });
+  const loadAvailableDocs = useCallback(async () => {
+    setLoadingDocs(true);
+    try {
+      const data = await listDocuments();
+      const ready = data.filter((d) => d.status === "ready");
+      setAvailableDocs(ready);
+      mergeDocNames(ready);
+    } catch {
+      toast.error("Failed to load documents");
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, [mergeDocNames]);
+
+  const lastHydratedKey = useRef("");
+  useEffect(() => {
+    if (docIds.length === 0) return;
+    if (docIds.every((id) => docNameByIdRef.current[id])) return;
+
+    // Guard against refetching the same doc set repeatedly when an id never
+    // resolves (e.g. a deleted doc still in scope) — its name stays unset, so
+    // the every() check above can't short-circuit on later renders.
+    const key = docIds.join(",");
+    if (lastHydratedKey.current === key) return;
+    lastHydratedKey.current = key;
+
+    let cancelled = false;
+    listDocuments()
+      .then((data) => {
+        if (cancelled) return;
+        mergeDocNames(data.filter((d) => d.status === "ready"));
+      })
+      .catch(() => {
+        // Allow a retry for this doc set if the fetch failed.
+        lastHydratedKey.current = "";
+        // loadAvailableDocs surfaces errors when the picker is open
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docIds, mergeDocNames]);
+
+  useEffect(() => {
+    if (docsVersion === undefined || docsVersion === 0) return;
+
+    let cancelled = false;
+    listDocuments()
+      .then((data) => {
+        if (cancelled) return;
+        const ready = data.filter((d) => d.status === "ready");
+        mergeDocNames(ready);
+        if (showDocPickerRef.current) setAvailableDocs(ready);
+      })
+      .catch(() => {
+        if (!cancelled && showDocPickerRef.current) {
+          toast.error("Failed to load documents");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docsVersion, mergeDocNames]);
+
+  const toggleDocPicker = () => {
+    if (!showDocPicker) loadAvailableDocs();
+    setShowDocPicker((v) => !v);
+  };
 
   const toggleDoc = (id: string) => {
     if (docIds.includes(id)) {
       onDocIdsChange(docIds.filter((d) => d !== id));
     } else {
+      const doc = availableDocs.find((d) => d.id === id);
+      if (doc) mergeDocNames([doc]);
       onDocIdsChange([...docIds, id]);
     }
   };
-
-  const attachedDocNames = docPicker.docs.flatMap((d) =>
-    docIds.includes(d.id) ? [d.filename] : [],
-  );
 
   const lastAssistantMsg = [...messages]
     .reverse()
@@ -396,7 +414,6 @@ export default function ChatBox({
     <div className="px-3 py-3 sm:px-6">
       <div className="mx-auto max-w-3xl border-t pt-3">
         <button
-          type="button"
           onClick={() => setSourcesCollapsed((v) => !v)}
           className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
         >
@@ -445,20 +462,20 @@ export default function ChatBox({
     <div className="mx-auto w-full max-w-3xl">
       <div className="rounded-2xl border bg-card shadow-sm">
         {/* Doc Picker Dropdown */}
-        {docPicker.open && (
+        {showDocPicker && (
           <div className="border-b px-4 py-3">
             <p className="mb-2 text-xs font-semibold text-muted-foreground">
               Add documents to this chat
             </p>
-            {docPicker.loading ? (
+            {loadingDocs ? (
               <p className="text-xs text-muted-foreground">Loading...</p>
-            ) : docPicker.docs.length === 0 ? (
+            ) : availableDocs.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No ready documents. Upload via Documents panel.
               </p>
             ) : (
               <ul className="space-y-1 max-h-48 overflow-y-auto">
-                {docPicker.docs.map((doc) => (
+                {availableDocs.map((doc) => (
                   <li key={doc.id}>
                     <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted">
                       <input
@@ -478,25 +495,28 @@ export default function ChatBox({
         )}
 
         {/* Attached doc chips */}
-        {docIds.length > 0 && !docPicker.open && (
+        {docIds.length > 0 && !showDocPicker && (
           <div className="flex flex-wrap gap-1.5 px-4 pt-3">
-            {attachedDocNames.map((name, i) => (
-              <span
-                key={docIds[i]}
-                className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
-              >
-                <FileText className="h-3 w-3 text-muted-foreground" />
-                {name}
-                <button
-                  type="button"
-                  onClick={() => toggleDoc(docIds[i])}
-                  className="ml-0.5 text-muted-foreground hover:text-foreground"
-                  aria-label={`Remove ${name}`}
+            {docIds.map((id) => {
+              const name = docNameById[id] ?? "Document";
+              return (
+                <span
+                  key={id}
+                  className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+                  <FileText className="h-3 w-3 text-muted-foreground" />
+                  {name}
+                  <button
+                    type="button"
+                    onClick={() => toggleDoc(id)}
+                    className="ml-0.5 text-muted-foreground hover:text-foreground"
+                    aria-label={`Remove ${name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
 

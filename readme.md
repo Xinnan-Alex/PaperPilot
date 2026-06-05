@@ -19,6 +19,7 @@
 - **Multi-format ingestion** — Upload PDF, DOCX, TXT, MD, or HTML files up to 20 MB.
 - **OCR fallback** — Scanned PDF pages are automatically extracted with Tesseract OCR.
 - **Semantic + lexical retrieval** — Hybrid search combining pgvector ANN similarity with Postgres full-text search (`tsvector`/`ts_rank_cd`), merged via Reciprocal Rank Fusion (RRF).
+- **Query rewriting + reranking** — `search_documents` expands each query into multiple variants (multi-query), fuses their results into a candidate pool, then reorders by relevance with Voyage `rerank-2-lite`. Retrieval depth (`top_k`) and context budget are configurable per model in `backend/models.json`. Rewrite and rerank are independently toggleable and degrade gracefully to plain hybrid search on failure.
 - **Agentic tool loop** — The assistant decides which tools to call (up to 5 iterations) and synthesises a final answer from the results.
 - **Built-in tools** — `search_documents` (hybrid RAG), `list_documents`, `get_document_summary`, and optional `web_search` (Tavily).
 - **Multi-provider LLM** — Switch between OpenAI (gpt-4o, gpt-4o-mini), DeepSeek (deepseek-chat), Groq (llama-3.3-70b), and Mistral (mistral-large) per message. The provider/model registry lives in `backend/models.json` — add models, flip per-provider or per-model `enabled` flags, and mark one model as `default: true` without touching code. Models only surface if their provider is enabled, the model is enabled, and the API key env var is set.
@@ -26,9 +27,9 @@
 - **Inline tool activity** — Tool calls and results render as collapsible bubbles in the chat so you can see exactly what the agent did.
 - **Streaming answers** — Real-time token-by-token responses with clickable inline citations (`[1]`, `[2]`, …). Rendered via `streamdown`, which handles partial / unterminated markdown blocks gracefully mid-stream.
 - **Provider-agnostic formatting** — The system prompt constrains the LLM to a restricted Markdown subset (paragraphs, `**bold**`, lists, code, citations) so output looks consistent whether the answer came from DeepSeek, OpenAI, Groq, or Mistral.
-- **Source provenance** — Every answer shows retrieved source cards with filename, page number, and text snippet.
+- **Source provenance** — Every answer shows retrieved source cards with filename, page number, and text snippet, with the best-matching sentence highlighted (lexical citation span).
 - **Persistent chat history** — All conversations stored in Supabase, synced across devices. Chat list in the sidebar; click any past chat to resume.
-- **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed.
+- **Per-chat document scope** — Each chat has its own attached documents. Pick from already-uploaded docs via "Add docs" — no re-uploading needed. Attached filenames stay visible after the picker closes and when you reopen a chat.
 - **Document deletion** — Hard-delete any uploaded document from the Documents panel. Removes the file from Storage, all text chunks, and embeddings with no recovery. Deleted docs are automatically removed from all active chat sessions.
 - **Auth & security** — GitHub OAuth via Supabase Auth; JWT verification on every API call; Row Level Security in Postgres; per-user rate limiting.
 - **Feedback loop** — Thumbs up/down on assistant messages.
@@ -177,7 +178,7 @@ sequenceDiagram
 2. **Chunk** — Recursive semantic splitting (≈800 chars, 100-char overlap).
 3. **Embed** — Voyage AI `voyage-3-lite` (512-dim vectors).
 4. **Store** — Supabase Postgres with `pgvector` HNSW index.
-5. **Retrieve** — Cosine similarity + Postgres FTS (`tsvector`/`ts_rank_cd`) + RRF reranking.
+5. **Retrieve** — Multi-query expansion → cosine similarity + Postgres FTS (`tsvector`/`ts_rank_cd`) fused via RRF → Voyage `rerank-2-lite` reranking → per-model `top_k`/context budget → lexical citation spans.
 6. **Agent** — LiteLLM provider abstraction, tool loop (up to 5 iterations), SSE streaming.
 
 ---
@@ -260,17 +261,20 @@ paperpilot/
 │   │   ├── api.py               # Routes, middleware, CORS, tool registration
 │   │   ├── agent.py             # Agentic loop — stream_completion + tool dispatch
 │   │   ├── providers.py         # Loads models.json; exposes available_models/providers + resolve + default_model
-│   │   ├── llm.py               # LiteLLM streaming wrapper
+│   │   ├── llm.py               # LiteLLM streaming + non-streaming (complete) wrappers
 │   │   ├── tools/
 │   │   │   ├── __init__.py      # ToolSpec, ToolContext, REGISTRY, dispatch()
-│   │   │   ├── search_docs.py   # search_documents tool (hybrid RAG)
+│   │   │   ├── search_docs.py   # search_documents tool (rewrite → fuse → rerank → spans)
 │   │   │   ├── docs.py          # list_documents + get_document_summary tools
 │   │   │   └── web_search.py    # web_search tool (Tavily, optional)
 │   │   ├── auth.py              # JWT verification (Supabase JWKS)
 │   │   ├── ingest.py            # File extraction + OCR
 │   │   ├── chunk.py             # Recursive text splitting
-│   │   ├── embed.py             # Voyage AI embeddings
-│   │   ├── retrieve.py          # Hybrid search (vector + BM25 + RRF)
+│   │   ├── embed.py             # Voyage AI embeddings (embed_documents/embed_queries)
+│   │   ├── retrieve.py          # Hybrid search + multi_query_search (vector + FTS + RRF)
+│   │   ├── rerank.py            # Voyage rerank-2-lite (graceful identity fallback)
+│   │   ├── query_rewrite.py     # LLM multi-query expansion (graceful fallback)
+│   │   ├── citation.py          # Lexical best-span for source highlighting
 │   │   ├── reader.py            # /query shim → agent.run (backward compat)
 │   │   ├── store.py             # DB operations
 │   │   └── cli.py               # Local CLI: ingest, ask
@@ -376,6 +380,13 @@ paperpilot/
 | `TAVILY_API_KEY` | No | Enables `web_search` tool |
 | `DEFAULT_MODEL_ID` | No | Fallback when no model in `backend/models.json` is marked `default: true` |
 | `AGENT_MAX_ITERATIONS` | No | Max tool-call iterations (default `5`) |
+| `ENABLE_RERANK` | No | Toggle Voyage reranking in `search_documents` (default `true`) |
+| `ENABLE_QUERY_REWRITE` | No | Toggle multi-query expansion (default `true`) |
+| `RERANK_MODEL` | No | Voyage rerank model (default `rerank-2-lite`) |
+| `QUERY_REWRITE_VARIANTS` | No | Extra query variants per search (default `2`) |
+| `RETRIEVAL_TOP_K` | No | Global default chunks returned, per-model overridable (default `5`) |
+| `RETRIEVAL_CANDIDATE_POOL` | No | Candidate pool size sent to the reranker (default `30`) |
+| `RETRIEVAL_CONTEXT_CHARS` | No | Global default context-char cap, per-model overridable (default `8000`) |
 | `FRONTEND_ORIGINS` | Yes | Comma-separated CORS origins |
 
 > *At least one LLM key must be set.

@@ -119,51 +119,44 @@ body {
   }
 }
 
-@keyframes backflip {
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+.theme-icon-hithere {
+  transform-origin: center;
+  animation: theme-icon-hithere 1s ease forwards;
+}
+
+@keyframes theme-icon-hithere {
   0% {
-    transform: rotateX(0deg);
+    transform: scale(1);
   }
+  30% {
+    transform: scale(1.2);
+  }
+  40%,
   60% {
-    transform: rotateX(300deg);
+    transform: rotate(-20deg) scale(1.2);
   }
-  80% {
-    transform: rotateX(360deg);
+  50% {
+    transform: rotate(20deg) scale(1.2);
+  }
+  70% {
+    transform: rotate(0deg) scale(1.2);
   }
   100% {
-    transform: rotateX(360deg);
-  }
-}
-
-@keyframes backflip-reverse {
-  0% {
-    transform: rotateX(0deg);
-  }
-  60% {
-    transform: rotateX(-300deg);
-  }
-  80% {
-    transform: rotateX(-360deg);
-  }
-  100% {
-    transform: rotateX(-360deg);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes ripple-expand {
-  from {
-    clip-path: circle(0% at var(--ripple-x) var(--ripple-y));
-  }
-  to {
-    clip-path: circle(150% at var(--ripple-x) var(--ripple-y));
+    transform: scale(1);
   }
 }
 
