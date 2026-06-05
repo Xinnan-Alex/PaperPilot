@@ -92,6 +92,7 @@ function ThemeIcon() {
     <>
       <button
         ref={ref}
+        type="button"
         onClick={handleClick}
         disabled={animating}
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
@@ -232,6 +233,7 @@ export default function Login() {
             {!showProviders ? (
               <>
                 <button
+                  type="button"
                   onClick={() => setShowProviders(true)}
                   className="l-cta group flex h-13 w-full items-center justify-center gap-2 rounded-2xl px-6 text-base font-semibold"
                 >
@@ -245,6 +247,7 @@ export default function Login() {
             ) : (
               <div className="w-full space-y-2.5">
                 <button
+                  type="button"
                   onClick={() => signIn("github")}
                   disabled={loading !== null}
                   className="l-surface l-pop flex h-13 w-full items-center justify-center gap-2.5 rounded-2xl px-6 text-base font-semibold"
@@ -257,6 +260,7 @@ export default function Login() {
                   Continue with GitHub
                 </button>
                 <button
+                  type="button"
                   onClick={() => signIn("google")}
                   disabled={loading !== null}
                   className="l-surface l-pop flex h-13 w-full items-center justify-center gap-2.5 rounded-2xl px-6 text-base font-semibold"
@@ -270,6 +274,7 @@ export default function Login() {
                   Continue with Google
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowProviders(false)}
                   disabled={loading !== null}
                   className="l-muted mx-auto mt-1 flex items-center gap-1.5 text-xs font-medium hover:text-[color:var(--ink)] disabled:opacity-50"

@@ -1,0 +1,34 @@
+name: React Doctor
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so --diff can resolve the PR base branch.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # --diff scans only files changed vs the PR base, so existing debt never
+      # blocks a PR while newly introduced issues are caught before merge.
+      - name: Scan changed files
+        run: pnpm dlx react-doctor@latest --verbose --diff

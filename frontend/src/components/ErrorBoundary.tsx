@@ -31,6 +31,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               {this.state.error.message}
             </p>
             <button
+              type="button"
               className="text-xs underline text-muted-foreground hover:text-foreground"
               onClick={() => this.setState({ error: null })}
             >

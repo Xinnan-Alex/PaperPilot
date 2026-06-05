@@ -1,5 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+// Loads the Geist Variable @font-face used by --font-sans in index.css.
+import "@fontsource-variable/geist";
 import "./index.css";
 import App from "./App.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";

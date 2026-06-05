@@ -1,6 +1,6 @@
 import { deleteDocument, ingestDocument, listDocuments, uploadDocument } from "@/lib/api";
 import { CheckCircle2, FileText, Loader2, Trash2, Upload, XCircle } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -34,26 +34,76 @@ interface UploadBoxProps {
   onDocsChanged?: () => void;
 }
 
+// Everything about the document list and the operations that mutate it
+// (initial load, upload, delete, delete-confirmation) is one cohesive slice.
+// dragOver is unrelated presentational state and stays its own useState.
+interface DocState {
+  docs: Doc[];
+  loading: boolean;
+  uploading: boolean;
+  confirmDeleteId: string | null;
+  deleting: string | null;
+}
+
+type DocAction =
+  | { type: "docsLoaded"; docs: Doc[] }
+  | { type: "loadFailed" }
+  | { type: "uploadStart" }
+  | { type: "uploadEnd" }
+  | { type: "deleteStart"; id: string }
+  | { type: "deleteEnd" }
+  | { type: "toggleConfirm"; id: string }
+  | { type: "clearConfirm" };
+
+const initialDocState: DocState = {
+  docs: [],
+  loading: true,
+  uploading: false,
+  confirmDeleteId: null,
+  deleting: null,
+};
+
+function docReducer(state: DocState, action: DocAction): DocState {
+  switch (action.type) {
+    case "docsLoaded":
+      return { ...state, docs: action.docs, loading: false };
+    case "loadFailed":
+      return { ...state, loading: false };
+    case "uploadStart":
+      return { ...state, uploading: true };
+    case "uploadEnd":
+      return { ...state, uploading: false };
+    case "deleteStart":
+      return { ...state, deleting: action.id, confirmDeleteId: null };
+    case "deleteEnd":
+      return { ...state, deleting: null };
+    case "toggleConfirm":
+      return {
+        ...state,
+        confirmDeleteId:
+          state.confirmDeleteId === action.id ? null : action.id,
+      };
+    case "clearConfirm":
+      return { ...state, confirmDeleteId: null };
+  }
+}
+
 export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProps) {
-  const [docs, setDocs] = useState<Doc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [{ docs, loading, uploading, confirmDeleteId, deleting }, dispatch] =
+    useReducer(docReducer, initialDocState);
   const [dragOver, setDragOver] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const fetchDocs = useCallback(async () => {
     try {
       const data = await listDocuments();
-      setDocs(data);
+      dispatch({ type: "docsLoaded", docs: data });
       onDocsChanged?.();
     } catch (err) {
       console.error("Failed to fetch documents:", err);
       toast.error("Failed to load documents");
-    } finally {
-      setLoading(false);
+      dispatch({ type: "loadFailed" });
     }
   }, [onDocsChanged]);
 
@@ -78,8 +128,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
   }, [docs, fetchDocs]);
 
   const handleDelete = async (docId: string) => {
-    setDeleting(docId);
-    setConfirmDeleteId(null);
+    dispatch({ type: "deleteStart", id: docId });
     try {
       await deleteDocument(docId);
       toast.success("Document permanently deleted");
@@ -88,7 +137,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
     } catch (err: any) {
       toast.error(err.message || "Delete failed");
     } finally {
-      setDeleting(null);
+      dispatch({ type: "deleteEnd" });
     }
   };
 
@@ -98,7 +147,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
       toast.error(error);
       return;
     }
-    setUploading(true);
+    dispatch({ type: "uploadStart" });
     try {
       const { doc_id } = await uploadDocument(file);
       await ingestDocument(doc_id);
@@ -107,7 +156,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
     } catch (err: any) {
       toast.error(err.message || "Upload failed");
     } finally {
-      setUploading(false);
+      dispatch({ type: "uploadEnd" });
     }
   };
 
@@ -185,7 +234,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
           </p>
         ) : (
           <>
-            <ul className="space-y-1" role="list">
+            <ul className="space-y-1">
               {docs.map((doc) => (
                 <li
                   key={doc.id}
@@ -221,9 +270,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
                         className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
                         aria-label="Delete document"
                         onClick={() =>
-                          setConfirmDeleteId(
-                            confirmDeleteId === doc.id ? null : doc.id,
-                          )
+                          dispatch({ type: "toggleConfirm", id: doc.id })
                         }
                       >
                         <Trash2 className="h-3 w-3" />
@@ -248,7 +295,7 @@ export default function UploadBox({ onDocDeleted, onDocsChanged }: UploadBoxProp
                           variant="ghost"
                           size="sm"
                           className="h-5 px-2 text-[10px]"
-                          onClick={() => setConfirmDeleteId(null)}
+                          onClick={() => dispatch({ type: "clearConfirm" })}
                         >
                           Cancel
                         </Button>

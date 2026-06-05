@@ -27,6 +27,7 @@ function CitationMark({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-muted px-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
       aria-label={`Jump to source ${index + 1}`}

@@ -65,15 +65,20 @@ export function useChatSessions() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Debounce timer per chat id for message persistence
-  const persistTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Debounce timer per chat id for message persistence. Lazily initialised so
+  // the Map is built once instead of being re-allocated on every render.
+  const persistTimers = useRef<Map<
+    string,
+    ReturnType<typeof setTimeout>
+  > | null>(null);
+  if (persistTimers.current === null) persistTimers.current = new Map();
 
   const schedulePersist = useCallback(
     (session: ChatSession) => {
-      const existing = persistTimers.current.get(session.id);
+      const existing = persistTimers.current?.get(session.id);
       if (existing) clearTimeout(existing);
       const timer = setTimeout(async () => {
-        persistTimers.current.delete(session.id);
+        persistTimers.current?.delete(session.id);
         await supabase.from("chat_sessions").update({
           title: session.title,
           messages: session.messages,
@@ -81,7 +86,7 @@ export function useChatSessions() {
           updated_at: new Date().toISOString(),
         }).eq("id", session.id);
       }, 1500);
-      persistTimers.current.set(session.id, timer);
+      persistTimers.current?.set(session.id, timer);
     },
     [],
   );

@@ -1,9 +1,10 @@
 import {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
+  useReducer,
   useState,
   type ReactNode,
 } from "react";
@@ -16,6 +17,41 @@ import {
 
 const LAST_MODEL_KEY = "paperpilot.lastModel";
 const FALLBACK_BADGE: ProviderBadge = { label: "Unknown", color: "#888888" };
+
+// The four values fetched together from the models API form one state slice:
+// they always move as a group (loading → loaded/failed), so a reducer keeps
+// those transitions atomic instead of spread across four useState setters.
+interface FetchState {
+  providers: ProviderInfo[];
+  models: ModelInfo[];
+  loading: boolean;
+  error: string | null;
+}
+
+type FetchAction =
+  | { type: "loaded"; providers: ProviderInfo[]; models: ModelInfo[] }
+  | { type: "failed"; error: string };
+
+const initialFetchState: FetchState = {
+  providers: [],
+  models: [],
+  loading: true,
+  error: null,
+};
+
+function fetchReducer(state: FetchState, action: FetchAction): FetchState {
+  switch (action.type) {
+    case "loaded":
+      return {
+        providers: action.providers,
+        models: action.models,
+        loading: false,
+        error: null,
+      };
+    case "failed":
+      return { ...state, loading: false, error: action.error };
+  }
+}
 
 interface ModelContextValue {
   providers: ProviderInfo[];
@@ -32,13 +68,16 @@ interface ModelContextValue {
 const ModelContext = createContext<ModelContextValue | null>(null);
 
 export function ModelProvider({ children }: { children: ReactNode }) {
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [{ providers, models, loading, error }, dispatch] = useReducer(
+    fetchReducer,
+    initialFetchState,
+  );
+  // selectedId is independent of the fetch slice — it survives across loads,
+  // is seeded from localStorage, and is driven by user choice — so it stays
+  // its own useState rather than being folded into the reducer.
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     localStorage.getItem(LAST_MODEL_KEY),
   );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,8 +85,11 @@ export function ModelProvider({ children }: { children: ReactNode }) {
       try {
         const payload = await getModels();
         if (cancelled) return;
-        setProviders(payload.providers);
-        setModels(payload.models);
+        dispatch({
+          type: "loaded",
+          providers: payload.providers,
+          models: payload.models,
+        });
         setSelectedId((prev) => {
           if (prev && payload.models.some((m) => m.id === prev)) return prev;
           if (
@@ -59,9 +101,12 @@ export function ModelProvider({ children }: { children: ReactNode }) {
           return payload.models[0]?.id ?? null;
         });
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "failed");
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          dispatch({
+            type: "failed",
+            error: err instanceof Error ? err.message : "failed",
+          });
+        }
       }
     })();
     return () => {
@@ -130,7 +175,7 @@ export function ModelProvider({ children }: { children: ReactNode }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useModels(): ModelContextValue {
-  const ctx = useContext(ModelContext);
+  const ctx = use(ModelContext);
   if (!ctx) throw new Error("useModels must be used inside <ModelProvider>");
   return ctx;
 }
