@@ -171,11 +171,14 @@ Revisit if ingestion volume or multi-step orchestration grows.
 
 ## Re-rendering the diagrams
 
-The `.excalidraw` sources are the source of truth; the `.png`s are committed
-renders. To regenerate after editing:
+The `.excalidraw` files in this directory are the source of truth; the `.png`s
+are committed renders. To regenerate a PNG after editing a source, open the
+`.excalidraw` file (drag it into <https://excalidraw.com> or the Excalidraw VS
+Code extension) and export to PNG, overwriting the committed image:
 
-```bash
-cd .claude/skills/excalidraw-diagram/references
-uv run python render_excalidraw.py ../../../../docs/design/ingestion-pipeline.excalidraw
-uv run python render_excalidraw.py ../../../../docs/design/ingestion-states.excalidraw
-```
+- `ingestion-pipeline.excalidraw` → `ingestion-pipeline.png`
+- `ingestion-states.excalidraw` → `ingestion-states.png`
+
+> These diagrams were originally rendered headlessly via a local Claude Code
+> Excalidraw skill, which is not vendored in this repo — hence the manual export
+> step above.
