@@ -32,6 +32,7 @@ uv run mypy src/
 pnpm dev       # dev server (localhost:5173)
 pnpm build     # tsc -b && vite build
 pnpm lint      # ESLint
+pnpm test      # Vitest run (jsdom + Testing Library); pnpm test:watch for watch mode
 pnpm doctor    # React Doctor health scan (npx react-doctor@latest)
 ```
 

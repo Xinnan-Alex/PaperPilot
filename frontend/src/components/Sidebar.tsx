@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -18,6 +19,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Dialog, DialogContent } from "./ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "./ui/alert-dialog";
 import { useSession } from "@/hooks/useSession";
 import { ThemeToggle } from "./ThemeToggle";
 import { BrandMark } from "./BrandMark";
@@ -86,6 +98,8 @@ export default function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const { user } = useSession();
+  // ID of the chat session pending delete confirmation (null = none open).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const displayName =
     user?.user_metadata?.user_name ||
@@ -184,6 +198,10 @@ export default function Sidebar({
           >
             <PanelLeftClose className="h-4 w-4" />
           </Button>
+          {/* Plain button (not DialogClose): fullSidebarBody also renders on the
+              desktop path outside any Dialog, so a DialogClose here would throw.
+              onMobileClose drives the Dialog's open state; Radix still returns
+              focus on close. */}
           <Button
             variant="ghost"
             size="icon"
@@ -249,7 +267,7 @@ export default function Sidebar({
                     className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDeleteChat(session.id);
+                      setConfirmDeleteId(session.id);
                     }}
                     aria-label="Delete chat"
                   >
@@ -294,7 +312,7 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar — unchanged */}
       <div
         className={cn(
           "hidden md:flex h-svh shrink-0 border-r border-border",
@@ -304,15 +322,51 @@ export default function Sidebar({
         {collapsed ? compactSidebarBody : fullSidebarBody}
       </div>
 
-      {/* Mobile drawer */}
-      <div
-        className={cn(
-          "md:hidden fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] border-r border-border transition-transform duration-200",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
+      {/* Mobile drawer — Radix Dialog for focus trap, Escape-to-close, and aria-modal */}
+      <Dialog
+        open={mobileOpen}
+        onOpenChange={(open) => {
+          if (!open) onMobileClose();
+        }}
       >
-        {fullSidebarBody}
-      </div>
+        <DialogContent
+          side="left"
+          className="w-72 max-w-[85vw] p-0"
+          title="Navigation"
+        >
+          {fullSidebarBody}
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat delete confirmation — AlertDialog */}
+      <AlertDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteId) {
+                  onDeleteChat(confirmDeleteId);
+                  setConfirmDeleteId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

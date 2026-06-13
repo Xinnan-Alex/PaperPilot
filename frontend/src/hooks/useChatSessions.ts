@@ -9,6 +9,11 @@ export type MessagePart =
 
 export interface ChatMessage {
   id: string;
+  // False positive: `role` here is the chat-turn role ("user" | "assistant"),
+  // not an RBAC/authorization column. Ownership is the user_id column, which is
+  // DB-defaulted to auth.uid() (migration 20260613130000) and enforced by RLS;
+  // the client no longer writes user_id at all.
+  // react-doctor-disable-next-line react-doctor/supabase-client-owned-authz-field
   role: "user" | "assistant";
   content: string;       // canonical text (joined from text parts on write)
   parts?: MessagePart[]; // assistant messages
@@ -113,7 +118,7 @@ export function useChatSessions() {
 
         const { data: newRow, error: insertErr } = await supabase
           .from("chat_sessions")
-          .insert({ user_id: userId, title: "New Chat", messages: [], doc_ids: [] })
+          .insert({ title: "New Chat", messages: [], doc_ids: [] })
           .select()
           .single();
 
@@ -136,7 +141,7 @@ export function useChatSessions() {
 
     const { data, error } = await supabase
       .from("chat_sessions")
-      .insert({ user_id: userId, title: "New Chat", messages: [], doc_ids: [] })
+      .insert({ title: "New Chat", messages: [], doc_ids: [] })
       .select()
       .single();
 
@@ -165,7 +170,7 @@ export function useChatSessions() {
               if (!userId) return;
               const { data } = await supabase
                 .from("chat_sessions")
-                .insert({ user_id: userId, title: "New Chat", messages: [], doc_ids: [] })
+                .insert({ title: "New Chat", messages: [], doc_ids: [] })
                 .select()
                 .single();
               if (data) {

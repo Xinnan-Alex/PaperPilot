@@ -6,12 +6,13 @@ Scope: PaperPilot backend, frontend, Supabase schema, RAG architecture, and comp
 
 ## Top Priorities
 
-1. Harden tenant isolation and Supabase permissions
+1. ~~Harden tenant isolation and Supabase permissions~~ — DONE
 
-   - References: `backend/src/paperpilot/db.py`, `backend/src/paperpilot/store.py`, `supabase/migrations/*.sql`
-   - Backend relies heavily on manual `WHERE user_id = :user_id` checks while using privileged DB access.
-   - Migrations grant broad privileges to `anon` and `authenticated`, which increases blast radius if a future policy or table is misconfigured.
-   - Improve by using least-privileged DB access where possible, tightening grants, adding cross-user access tests, and enforcing ownership with DB constraints.
+   - ~~References: `backend/src/paperpilot/db.py`, `backend/src/paperpilot/store.py`, `supabase/migrations/*.sql`~~
+   - ~~Backend relies heavily on manual `WHERE user_id = :user_id` checks while using privileged DB access.~~
+   - ~~Migrations grant broad privileges to `anon` and `authenticated`, which increases blast radius if a future policy or table is misconfigured.~~
+   - ~~Improve by using least-privileged DB access where possible, tightening grants, adding cross-user access tests, and enforcing ownership with DB constraints.~~
+   - Shipped (migration `20260613120000_tighten_grants_and_constraints`): `REVOKE ALL` from `anon`/`authenticated` on `documents`/`chunks`/`feedback` (backend-only via service_role); narrowed `chat_sessions` `authenticated` grant from `ALL` → `SELECT/INSERT/UPDATE/DELETE`; revoked `anon` on `chat_sessions`. Ownership enforced at the DB: composite FK `chunks(document_id, user_id) → documents(id, user_id)` makes cross-user chunk smuggling impossible. Cross-user regression tests in `backend/tests/test_store_isolation.py` lock in that every `store.py` read/delete/insert is `user_id`-scoped. RLS retained as defense-in-depth.
 
 2. ~~Move keyword retrieval out of Python~~
 
@@ -35,29 +36,33 @@ Scope: PaperPilot backend, frontend, Supabase schema, RAG architecture, and comp
    - ~~Keep a `docId -> filename` cache or persist ready documents outside picker state.~~
    - Shipped: `docNameByIdRef` cache in `ChatBox` keeps chip labels visible after picker closes / on session reopen.
 
-5. Harden SSE streaming and error UX
+5. ~~Harden SSE streaming and error UX~~ — DONE
 
-   - References: `frontend/src/lib/api.ts`, `frontend/src/components/ChatBox.tsx:227-256`
-   - Frontend removes the assistant response on stream failure and only shows a toast.
-   - Add a tested SSE parser, preserve partial output, show inline retry/error state, and avoid duplicate parsers.
+   - ~~References: `frontend/src/lib/api.ts`, `frontend/src/components/ChatBox.tsx:227-256`~~
+   - ~~Frontend removes the assistant response on stream failure and only shows a toast.~~
+   - ~~Add a tested SSE parser, preserve partial output, show inline retry/error state, and avoid duplicate parsers.~~
+   - Shipped: exported, hardened `parseSSEStream` (normalises `\r\n`/`\r`, optional colon-space, ignores comment/blank lines, wraps every `JSON.parse` in try/catch so one malformed event can't kill the stream) with 18 unit tests. On stream failure ChatBox now **keeps** the partial assistant message and renders an inline error row + **Retry** (re-streams the stored turn via a shared `runStream` helper) instead of deleting the message. Failure state is local (never persisted to DB).
 
-6. Add frontend tests
+6. ~~Add frontend tests~~ — DONE
 
-   - Reference: `frontend/package.json`
-   - No frontend test script or test files were found.
-   - Start with SSE parser tests, `useChatSessions`, chat cancellation/errors, document picker, and upload/delete flows.
+   - ~~Reference: `frontend/package.json`~~
+   - ~~No frontend test script or test files were found.~~
+   - ~~Start with SSE parser tests, `useChatSessions`, chat cancellation/errors, document picker, and upload/delete flows.~~
+   - Shipped: Vitest + Testing Library + jsdom test infra (`vitest.config.ts`, `src/test/setup.ts`, `pnpm test` / `pnpm test:watch`). 32 tests: `src/lib/api.test.ts` (SSE parser — event types, chunk-split reassembly, line endings, malformed-event resilience), `src/hooks/useChatSessions.test.ts` (load/create/delete/title derivation), `src/components/ChatBox.test.tsx` (partial-output preservation + Retry on stream failure). Test files excluded from `tsc -b` build.
 
-7. Improve mobile drawer accessibility
+7. ~~Improve mobile drawer accessibility~~ — DONE
 
-   - References: `frontend/src/pages/AppPage.tsx`, `frontend/src/components/Sidebar.tsx`
-   - Mobile panels behave like modals but are plain `div` elements.
-   - Use Radix `Dialog` with focus trap, Escape handling, `aria-modal`, and focus return.
+   - ~~References: `frontend/src/pages/AppPage.tsx`, `frontend/src/components/Sidebar.tsx`~~
+   - ~~Mobile panels behave like modals but are plain `div` elements.~~
+   - ~~Use Radix `Dialog` with focus trap, Escape handling, `aria-modal`, and focus return.~~
+   - Shipped: new `components/ui/dialog.tsx` (Radix Dialog wrapper, `side="left|right|center"` drawer/modal variants, always-present accessible title). Mobile sidebar and mobile documents panel now render through Radix `Dialog` (focus trap, Escape, `aria-modal`, focus return, managed overlay); manual backdrops removed. Desktop layout unchanged.
 
-8. Add destructive confirmation for chat deletion
+8. ~~Add destructive confirmation for chat deletion~~ — DONE
 
-   - Reference: `frontend/src/components/Sidebar.tsx`
-   - Document deletion has confirmation, but chat deletion is immediate.
-   - Add a confirmation modal or undo toast.
+   - ~~Reference: `frontend/src/components/Sidebar.tsx`~~
+   - ~~Document deletion has confirmation, but chat deletion is immediate.~~
+   - ~~Add a confirmation modal or undo toast.~~
+   - Shipped: new `components/ui/alert-dialog.tsx` (Radix AlertDialog wrapper). The per-chat trash button now opens a confirmation modal ("Delete chat? … can't be undone") before calling `onDeleteChat`; keyboard-accessible via Radix.
 
 9. ~~Make ingestion reliable and observable~~ — DONE
 
@@ -67,11 +72,12 @@ Scope: PaperPilot backend, frontend, Supabase schema, RAG architecture, and comp
    - ~~Add parse/OCR/embed statuses, retries, error details, and cleanup for orphaned storage objects.~~
    - Shipped: per-stage tracking (`documents.stage`: downloading → extracting → chunking → embedding → storing) surfaced live in `UploadBox`; persisted `error_detail` shown on failed docs; `retry_count` + `updated_at` columns (migration `20260605120000`). Exponential-backoff retries on download and embed (run off the event loop via `asyncio.to_thread`); typed `_IngestError` carries the failing stage into the DB. Orphaned-storage cleanup: `upload` deletes the Storage object if the `documents` insert fails. A still-queued/processing job stays pollable; failed docs are re-ingestable (status reset clears stage/error). Job-queue/worker migration deferred — background task is sufficient at current scale.
 
-10. Tighten DB constraints and indexes
+10. ~~Tighten DB constraints and indexes~~ — DONE
 
-    - References: `supabase/migrations/*.sql`
-    - Add constraints for `documents.status`, `chunks.embedding NOT NULL`, `UNIQUE(document_id, ordinal)`, `UNIQUE(storage_path)`, and a composite ownership FK for `chunks(document_id, user_id)`.
-    - Add indexes such as `documents(user_id, created_at DESC)` and `chunks(user_id, document_id, ordinal)`.
+    - ~~References: `supabase/migrations/*.sql`~~
+    - ~~Add constraints for `documents.status`, `chunks.embedding NOT NULL`, `UNIQUE(document_id, ordinal)`, `UNIQUE(storage_path)`, and a composite ownership FK for `chunks(document_id, user_id)`.~~
+    - ~~Add indexes such as `documents(user_id, created_at DESC)` and `chunks(user_id, document_id, ordinal)`.~~
+    - Shipped (migration `20260613120000`): CHECK on `documents.status` and `documents.stage`; `chunks.embedding SET NOT NULL`; `UNIQUE(chunks.document_id, ordinal)`; `UNIQUE(documents.storage_path)`; composite FK `chunks(document_id, user_id) → documents(id, user_id)` (with `UNIQUE(documents.id, user_id)` as its target); indexes `documents(user_id, created_at DESC)` and `chunks(user_id, document_id, ordinal)`. **Pre-deploy note:** `embedding SET NOT NULL` fails if any existing prod rows have NULL embeddings — run `SELECT count(*) FROM chunks WHERE embedding IS NULL;` and clean up before `db push`.
 
 ## Medium Priorities
 
@@ -148,10 +154,10 @@ Scope: PaperPilot backend, frontend, Supabase schema, RAG architecture, and comp
 
 ## Recommended Implementation Order
 
-1. Security, tenant hardening, and DB constraints.
-2. ~~Retrieval scalability: Postgres full-text search~~ (FTS done; indexes still pending).
-3. SSE/chat reliability fixes. _(SSE parser unified in `parseSSEStream`; partial-output preservation + inline retry still pending.)_
-4. Frontend tests and component split.
+1. ~~Security, tenant hardening, and DB constraints.~~ — DONE (item 1 + item 10).
+2. ~~Retrieval scalability: Postgres full-text search~~ — DONE (FTS + supporting indexes).
+3. ~~SSE/chat reliability fixes.~~ — DONE (hardened `parseSSEStream`, partial-output preservation, inline retry).
+4. Frontend tests ~~and component split~~. _(Tests DONE; `ChatBox` component split — item 11 — still pending.)_
 5. Ingestion worker/status improvements.
 6. ~~RAG quality: reranking, query rewriting, and better citations.~~ — DONE
 7. Notebook/workspace/product differentiators.
