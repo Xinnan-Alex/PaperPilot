@@ -83,6 +83,23 @@ function handleStreamEvent(event: StreamEvent, h: EventHandlers): void {
   }
 }
 
+// Pure DOM helpers — no component state/props, so they live at module scope
+// (one binding) instead of being recreated on every render.
+function handleSourceClick(chunkId: string): void {
+  const el = document.getElementById(`source-${chunkId}`);
+  el?.classList.add("ring-2", "ring-ring");
+  setTimeout(() => el?.classList.remove("ring-2", "ring-ring"), 2000);
+}
+
+async function handleOpenSource(src: SSESource): Promise<void> {
+  try {
+    const { url } = await getDocumentDownloadUrl(src.source_url ?? "");
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch {
+    toast.error("Could not open source document");
+  }
+}
+
 interface ChatBoxProps {
   chatId: string;
   messages: ChatMessage[];
@@ -118,7 +135,9 @@ export default function ChatBox({
   >(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const sourcesRef = useRef<Map<string, SSESource[]>>(new Map());
+  // Lazy ref init: allocate the Map once, not on every render.
+  const sourcesRef = useRef<Map<string, SSESource[]> | null>(null);
+  if (sourcesRef.current === null) sourcesRef.current = new Map();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useSession();
 
@@ -137,21 +156,6 @@ export default function ChatBox({
       });
     });
   }, []);
-
-  const handleSourceClick = (chunkId: string) => {
-    const el = document.getElementById(`source-${chunkId}`);
-    el?.classList.add("ring-2", "ring-ring");
-    setTimeout(() => el?.classList.remove("ring-2", "ring-ring"), 2000);
-  };
-
-  const handleOpenSource = async (src: SSESource) => {
-    try {
-      const { url } = await getDocumentDownloadUrl(src.source_url ?? "");
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch {
-      toast.error("Could not open source document");
-    }
-  };
 
   // Core streaming helper: drives a single assistant turn. Reused by
   // handleSend (new turn) and the inline Retry button (re-stream failed turn).
@@ -224,7 +228,7 @@ export default function ChatBox({
             pushTool,
             updateTool,
             onSources: (sources) => {
-              sourcesRef.current.set(assistantId, sources);
+              sourcesRef.current?.set(assistantId, sources);
               updateAssistant((m) => ({ ...m, sources }));
             },
           });
@@ -336,7 +340,7 @@ export default function ChatBox({
   };
 
   const handleFeedback = async (msg: ChatMessage, rating: 1 | -1) => {
-    const sources = msg.sources || sourcesRef.current.get(msg.id) || [];
+    const sources = msg.sources || sourcesRef.current?.get(msg.id) || [];
     const chunksIds = sources.map((s) => s.chunk_id);
     setRatingLoading(msg.id);
     try {
@@ -488,6 +492,7 @@ export default function ChatBox({
     <div className="px-3 py-3 sm:px-6">
       <div className="mx-auto max-w-3xl border-t pt-3">
         <button
+          type="button"
           onClick={() => setSourcesCollapsed((v) => !v)}
           className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
         >
