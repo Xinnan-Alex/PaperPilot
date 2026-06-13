@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import ChatBox from "@/components/ChatBox";
 import UploadBox from "@/components/UploadBox";
 import Sidebar from "@/components/Sidebar";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useChatSessions } from "@/hooks/useChatSessions";
 
 export default function AppPage() {
@@ -47,15 +47,7 @@ export default function AppPage() {
 
   return (
     <div className="flex h-svh w-full overflow-hidden bg-background">
-      {/* Mobile sidebar backdrop */}
-      {mobileSidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={() => setMobileSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
+      {/* Sidebar: desktop renders inline; mobile uses Radix Dialog inside Sidebar */}
       <Sidebar
         sessions={sessions}
         activeChatId={activeChatId ?? ""}
@@ -71,28 +63,40 @@ export default function AppPage() {
       />
 
       <main className="flex flex-1 overflow-hidden">
+        {/* Desktop docs panel — static column, unchanged */}
         {showDocs && (
-          <>
-            <div
-              className="fixed inset-0 z-30 bg-black/50 md:hidden"
-              onClick={() => setShowDocs(false)}
-              aria-hidden="true"
+          <div className="hidden md:block w-80 border-r border-border overflow-y-auto shrink-0">
+            <UploadBox
+              onDocDeleted={handleDocDeleted}
+              onDocsChanged={handleDocsChanged}
             />
-            <div className="fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-border bg-background overflow-y-auto md:static md:z-auto md:max-w-none md:w-80 md:border-l-0 md:border-r">
-              <div className="flex justify-end p-2 md:hidden">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowDocs(false)}
-                  aria-label="Close documents"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <UploadBox onDocDeleted={handleDocDeleted} onDocsChanged={handleDocsChanged} />
-            </div>
-          </>
+          </div>
         )}
+
+        {/* Mobile docs panel — Radix Dialog drawer (right side).
+            UploadBox is mounted twice (once here, once in the desktop column
+            above) but only one is ever rendered at a time: the desktop column
+            is `hidden md:block` and this Dialog only opens on mobile.
+            Two separate mounts was chosen for correctness/a11y over a shared
+            mount that would need complex forwarding. */}
+        <Dialog
+          open={showDocs}
+          onOpenChange={(open) => {
+            if (!open) setShowDocs(false);
+          }}
+        >
+          <DialogContent
+            side="right"
+            className="md:hidden w-full max-w-sm p-0 overflow-y-auto"
+            title="Documents"
+          >
+            <UploadBox
+              onDocDeleted={handleDocDeleted}
+              onDocsChanged={handleDocsChanged}
+            />
+          </DialogContent>
+        </Dialog>
+
         <div className="flex-1 overflow-hidden">
           {activeSession && activeChatId && (
             <ErrorBoundary key={activeChatId}>

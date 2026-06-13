@@ -114,8 +114,8 @@ async def test_search_documents_rewrite_and_rerank(
     ) -> list[dict[str, Any]]:
         captured["queries"] = queries
         return [
-            {"id": "c-1", "document_id": "d", "ordinal": 0, "page": 1, "text": "alpha", "filename": "f"},
-            {"id": "c-2", "document_id": "d", "ordinal": 1, "page": 1, "text": "beta", "filename": "f"},
+            {"id": "c-1", "document_id": "d", "ordinal": 0, "page": 1, "text": "alpha", "filename": "f"},  # noqa: E501
+            {"id": "c-2", "document_id": "d", "ordinal": 1, "page": 1, "text": "beta", "filename": "f"},  # noqa: E501
         ]
 
     monkeypatch.setattr(search_docs, "multi_query_search", fake_multi)

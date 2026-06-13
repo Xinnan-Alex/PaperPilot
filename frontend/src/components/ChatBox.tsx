@@ -5,6 +5,7 @@ import {
   listDocuments,
   type SSESource,
   type StreamEvent,
+  type ChatTurnMessage,
 } from "@/lib/api";
 import ModelPicker from "./ModelPicker";
 import ToolCallBubble, { type ToolCallState } from "./ToolCallBubble";
@@ -24,6 +25,7 @@ import {
   X,
   ChevronDown,
   Menu,
+  RotateCcw,
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import MarkdownContent from "./MarkdownContent";
@@ -109,6 +111,11 @@ export default function ChatBox({
   const [availableDocs, setAvailableDocs] = useState<AvailableDoc[]>([]);
   const [docNameById, setDocNameById] = useState<Record<string, string>>({});
   const [loadingDocs, setLoadingDocs] = useState(false);
+  // Maps assistantId → failed turn context for inline retry.
+  // This is local state only — never persisted to the DB.
+  const [failedTurns, setFailedTurns] = useState<
+    Map<string, { turn: ChatTurnMessage[]; modelId: string; docIds: string[]; error: string }>
+  >(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sourcesRef = useRef<Map<string, SSESource[]>>(new Map());
@@ -120,14 +127,16 @@ export default function ChatBox({
   const displayName =
     user?.user_metadata?.user_name || user?.email?.split("@")[0] || "there";
 
-  const scrollToBottom = () => {
+  // Stable identity (scrollRef is a ref) so the runStream useCallback below
+  // doesn't get a new dependency on every render.
+  const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({
         top: scrollRef.current.scrollHeight,
         behavior: "smooth",
       });
     });
-  };
+  }, []);
 
   const handleSourceClick = (chunkId: string) => {
     const el = document.getElementById(`source-${chunkId}`);
@@ -143,6 +152,127 @@ export default function ChatBox({
       toast.error("Could not open source document");
     }
   };
+
+  // Core streaming helper: drives a single assistant turn. Reused by
+  // handleSend (new turn) and the inline Retry button (re-stream failed turn).
+  const runStream = useCallback(
+    async (
+      assistantId: string,
+      turn: ChatTurnMessage[],
+      modelId: string,
+      streamDocIds: string[],
+    ) => {
+      const updateAssistant = (mut: (m: ChatMessage) => ChatMessage) => {
+        onMessagesChange((prev) =>
+          prev.map((m) => (m.id === assistantId ? mut(m) : m)),
+        );
+      };
+
+      const appendText = (text: string) => {
+        updateAssistant((m) => {
+          const parts: MessagePart[] = m.parts ? [...m.parts] : [];
+          const last = parts[parts.length - 1];
+          if (last && last.type === "text") {
+            parts[parts.length - 1] = {
+              type: "text",
+              text: last.text + text,
+            };
+          } else {
+            parts.push({ type: "text", text });
+          }
+          const content = parts
+            .filter((p): p is { type: "text"; text: string } => p.type === "text")
+            .map((p) => p.text)
+            .join("");
+          return { ...m, parts, content };
+        });
+      };
+
+      const pushTool = (tool: ToolCallState) => {
+        updateAssistant((m) => {
+          const parts: MessagePart[] = m.parts ? [...m.parts] : [];
+          parts.push({ type: "tool", tool });
+          return { ...m, parts };
+        });
+      };
+
+      const updateTool = (id: string, mut: (t: ToolCallState) => ToolCallState) => {
+        updateAssistant((m) => {
+          const parts = (m.parts ?? []).map((p) =>
+            p.type === "tool" && p.tool.id === id
+              ? { type: "tool" as const, tool: mut(p.tool) }
+              : p,
+          );
+          return { ...m, parts };
+        });
+      };
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStreaming(true);
+      scrollToBottom();
+
+      try {
+        for await (const event of chatStream(
+          turn,
+          modelId,
+          streamDocIds.length > 0 ? streamDocIds : undefined,
+          controller.signal,
+        )) {
+          handleStreamEvent(event, {
+            appendText,
+            pushTool,
+            updateTool,
+            onSources: (sources) => {
+              sourcesRef.current.set(assistantId, sources);
+              updateAssistant((m) => ({ ...m, sources }));
+            },
+          });
+          scrollToBottom();
+        }
+        // chatStream swallows AbortError and returns normally — detect via signal
+        if (controller.signal.aborted) {
+          appendText(" [stopped]");
+          setFailedTurns((prev) => {
+            const next = new Map(prev);
+            next.delete(assistantId);
+            return next;
+          });
+        } else {
+          // Clean completion — clear any prior failure for this turn
+          setFailedTurns((prev) => {
+            const next = new Map(prev);
+            next.delete(assistantId);
+            return next;
+          });
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // Fallback: some paths may still surface AbortError directly
+          appendText(" [stopped]");
+          setFailedTurns((prev) => {
+            const next = new Map(prev);
+            next.delete(assistantId);
+            return next;
+          });
+        } else {
+          const msg = err instanceof Error ? err.message : "Chat failed";
+          // Keep whatever partial text already streamed and record the failure
+          // so the inline retry row can appear.
+          setFailedTurns((prev) => {
+            const next = new Map(prev);
+            next.set(assistantId, { turn, modelId, docIds: streamDocIds, error: msg });
+            return next;
+          });
+          toast.error(msg);
+        }
+      } finally {
+        setStreaming(false);
+        abortRef.current = null;
+      }
+    },
+    [onMessagesChange, scrollToBottom],
+  );
 
   const handleSend = async () => {
     const q = input.trim();
@@ -173,91 +303,33 @@ export default function ChatBox({
     const turn = [
       ...messages
         .filter((m) => m.role === "user" || (m.content && m.content.trim()))
-        .map((m) => ({ role: m.role, content: m.content })),
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user" as const, content: q },
     ];
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStreaming(true);
-    scrollToBottom();
-
-    const updateAssistant = (mut: (m: ChatMessage) => ChatMessage) => {
-      onMessagesChange((prev) =>
-        prev.map((m) => (m.id === assistantId ? mut(m) : m)),
-      );
-    };
-
-    const appendText = (text: string) => {
-      updateAssistant((m) => {
-        const parts: MessagePart[] = m.parts ? [...m.parts] : [];
-        const last = parts[parts.length - 1];
-        if (last && last.type === "text") {
-          parts[parts.length - 1] = {
-            type: "text",
-            text: last.text + text,
-          };
-        } else {
-          parts.push({ type: "text", text });
-        }
-        const content = parts
-          .filter((p): p is { type: "text"; text: string } => p.type === "text")
-          .map((p) => p.text)
-          .join("");
-        return { ...m, parts, content };
-      });
-    };
-
-    const pushTool = (tool: ToolCallState) => {
-      updateAssistant((m) => {
-        const parts: MessagePart[] = m.parts ? [...m.parts] : [];
-        parts.push({ type: "tool", tool });
-        return { ...m, parts };
-      });
-    };
-
-    const updateTool = (id: string, mut: (t: ToolCallState) => ToolCallState) => {
-      updateAssistant((m) => {
-        const parts = (m.parts ?? []).map((p) =>
-          p.type === "tool" && p.tool.id === id
-            ? { type: "tool" as const, tool: mut(p.tool) }
-            : p,
-        );
-        return { ...m, parts };
-      });
-    };
-
-    try {
-      for await (const event of chatStream(
-        turn,
-        selectedId,
-        docIds.length > 0 ? docIds : undefined,
-        controller.signal,
-      )) {
-        handleStreamEvent(event, {
-          appendText,
-          pushTool,
-          updateTool,
-          onSources: (sources) => {
-            sourcesRef.current.set(assistantId, sources);
-            updateAssistant((m) => ({ ...m, sources }));
-          },
-        });
-        scrollToBottom();
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        appendText(" [stopped]");
-      } else {
-        const msg = err instanceof Error ? err.message : "Chat failed";
-        toast.error(msg);
-        onMessagesChange((prev) => prev.filter((m) => m.id !== assistantId));
-      }
-    } finally {
-      setStreaming(false);
-      abortRef.current = null;
-    }
+    await runStream(assistantId, turn, selectedId, docIds);
   };
+
+  const handleRetry = useCallback(
+    async (assistantId: string) => {
+      const failed = failedTurns.get(assistantId);
+      if (!failed || streaming) return;
+      // Reset this assistant message's content/parts so it starts fresh
+      onMessagesChange((prev) =>
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, content: "", parts: [], sources: undefined } : m,
+        ),
+      );
+      // Clear failure record before re-streaming (runStream will re-set if it fails again)
+      setFailedTurns((prev) => {
+        const next = new Map(prev);
+        next.delete(assistantId);
+        return next;
+      });
+      await runStream(assistantId, failed.turn, failed.modelId, failed.docIds);
+    },
+    [failedTurns, streaming, onMessagesChange, runStream],
+  );
 
   const handleCancel = () => {
     abortRef.current?.abort();
@@ -657,7 +729,25 @@ export default function ChatBox({
                       ) : (
                         streaming && <ThinkingBubble />
                       )}
-                      {msg.content && !streaming && (
+                      {/* Inline error + retry row — shown when this turn failed */}
+                      {failedTurns.has(msg.id) && (
+                        <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                          <span className="flex-1 truncate">
+                            {failedTurns.get(msg.id)?.error ?? "Stream failed"}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 gap-1.5"
+                            onClick={() => void handleRetry(msg.id)}
+                            aria-label="Retry"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Retry
+                          </Button>
+                        </div>
+                      )}
+                      {msg.content && !streaming && !failedTurns.has(msg.id) && (
                         <div className="mt-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"

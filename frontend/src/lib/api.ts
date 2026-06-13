@@ -212,7 +212,11 @@ export async function getModels(): Promise<ModelsPayload> {
   return apiFetch("/models");
 }
 
-async function* parseSSEStream(
+// Exported for unit testing. Parses an SSE Response body into typed StreamEvents.
+// Handles \r\n, \r, and \n line endings; SSE fields with or without a space
+// after the colon; comment lines (":..."); and blank lines (dispatch boundary).
+// Every JSON.parse is guarded — a malformed event is skipped, not fatal.
+export async function* parseSSEStream(
   res: Response,
 ): AsyncGenerator<StreamEvent> {
   const reader = res.body?.getReader();
@@ -222,20 +226,38 @@ async function* parseSSEStream(
   let buffer = "";
   let currentEvent = "";
 
+  // Normalise any line ending to \n so split("\n") covers all cases.
+  function normalizeLineEndings(s: string): string {
+    return s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  }
+
+  // SSE field value: strip the single leading space per spec (if present).
+  function fieldValue(raw: string): string {
+    return raw.startsWith(" ") ? raw.slice(1) : raw;
+  }
+
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += normalizeLineEndings(decoder.decode(value, { stream: true }));
       const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      buffer = lines.pop() ?? "";
 
       for (const line of lines) {
-        if (line.startsWith("event: ")) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
-          const payload = line.slice(6);
+        // Ignore comment lines and blank lines (blank = dispatch boundary).
+        if (line === "" || line.startsWith(":")) continue;
+
+        // event field — accept "event:" or "event: "
+        if (line.startsWith("event:")) {
+          currentEvent = fieldValue(line.slice(6)).trim();
+          continue;
+        }
+
+        // data field — accept "data:" or "data: "
+        if (line.startsWith("data:")) {
+          const payload = fieldValue(line.slice(5));
           if (currentEvent === "token") {
             try {
               yield { type: "token", data: JSON.parse(payload) as string };
@@ -243,11 +265,23 @@ async function* parseSSEStream(
               yield { type: "token", data: payload };
             }
           } else if (currentEvent === "sources") {
-            yield { type: "sources", data: JSON.parse(payload) as SSESource[] };
+            try {
+              yield { type: "sources", data: JSON.parse(payload) as SSESource[] };
+            } catch {
+              // skip malformed sources event
+            }
           } else if (currentEvent === "tool_call") {
-            yield { type: "tool_call", data: JSON.parse(payload) };
+            try {
+              yield { type: "tool_call", data: JSON.parse(payload) };
+            } catch {
+              // skip malformed tool_call event
+            }
           } else if (currentEvent === "tool_result") {
-            yield { type: "tool_result", data: JSON.parse(payload) };
+            try {
+              yield { type: "tool_result", data: JSON.parse(payload) };
+            } catch {
+              // skip malformed tool_result event
+            }
           } else if (currentEvent === "done") {
             yield { type: "done" };
           }
