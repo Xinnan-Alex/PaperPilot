@@ -81,6 +81,24 @@ ALTER TABLE public.documents
 -- The ingest pipeline always embeds every chunk before calling insert_chunks
 -- (store.py), so embedding is never NULL at insert time. Make that invariant
 -- explicit so a future code regression surfaces at the DB layer immediately.
+--
+-- Guard first: a hard `SET NOT NULL` would fail with an opaque error on any
+-- environment that still holds legacy NULL embeddings (e.g. a partially-failed
+-- ingest). Fail early with an actionable message instead so the operator can
+-- re-ingest or delete those rows before retrying this migration.
+DO $$
+DECLARE
+    null_count bigint;
+BEGIN
+    SELECT count(*) INTO null_count FROM public.chunks WHERE embedding IS NULL;
+    IF null_count > 0 THEN
+        RAISE EXCEPTION
+            'Cannot set chunks.embedding NOT NULL: % row(s) have NULL embeddings. '
+            'Re-ingest or delete those chunks, then re-run this migration.',
+            null_count;
+    END IF;
+END $$;
+
 ALTER TABLE public.chunks ALTER COLUMN embedding SET NOT NULL;
 
 -- Each (document_id, ordinal) pair must be unique within a document.

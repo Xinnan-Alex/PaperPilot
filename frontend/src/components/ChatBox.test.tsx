@@ -261,12 +261,12 @@ describe("ChatBox — stream error: partial output preserved + retry control", (
   });
 });
 
-describe("ChatBox — abort (stop button)", () => {
-  it("does NOT show Retry after user stops the stream", async () => {
-    // This test verifies the abort path: the stream is cancelled via Stop
-    // and no Retry button appears (unlike the error path). We don't try to
-    // assert on "[stopped]" text because it requires precise timing of the
-    // abort microtask vs. React's reconciler in jsdom.
+describe("ChatBox — clean completion", () => {
+  it("does NOT show Retry after the stream completes normally", async () => {
+    // Verifies that a successfully completed stream does not surface a Retry
+    // button (unlike the error path). The actual Stop-button abort flow isn't
+    // exercised here: asserting on it requires precise timing of the abort
+    // microtask vs. React's reconciler that is unreliable in jsdom.
     const user = userEvent.setup();
 
     // chatStream resolves immediately (no hang needed for this assertion)

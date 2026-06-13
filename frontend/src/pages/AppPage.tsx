@@ -6,9 +6,11 @@ import Sidebar from "@/components/Sidebar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useChatSessions } from "@/hooks/useChatSessions";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function AppPage() {
   const [showDocs, setShowDocs] = useState(false);
+  const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [docsVersion, setDocsVersion] = useState(0);
@@ -73,21 +75,20 @@ export default function AppPage() {
           </div>
         )}
 
-        {/* Mobile docs panel — Radix Dialog drawer (right side).
-            UploadBox is mounted twice (once here, once in the desktop column
-            above) but only one is ever rendered at a time: the desktop column
-            is `hidden md:block` and this Dialog only opens on mobile.
-            Two separate mounts was chosen for correctness/a11y over a shared
-            mount that would need complex forwarding. */}
+        {/* Mobile docs panel — Radix Dialog drawer (right side). Gated on
+            `isMobile` so it never opens on desktop: `showDocs` also drives the
+            static desktop column above, and an open Dialog would otherwise
+            activate its overlay/focus-trap/scroll-lock on desktop. UploadBox is
+            mounted in both panels but only one is ever in the DOM at a time. */}
         <Dialog
-          open={showDocs}
+          open={showDocs && isMobile}
           onOpenChange={(open) => {
             if (!open) setShowDocs(false);
           }}
         >
           <DialogContent
             side="right"
-            className="md:hidden w-full max-w-sm p-0 overflow-y-auto"
+            className="w-full max-w-sm p-0 overflow-y-auto"
             title="Documents"
           >
             <UploadBox

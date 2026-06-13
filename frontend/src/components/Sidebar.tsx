@@ -19,11 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogClose,
-} from "./ui/dialog";
+import { Dialog, DialogContent } from "./ui/dialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -202,17 +198,19 @@ export default function Sidebar({
           >
             <PanelLeftClose className="h-4 w-4" />
           </Button>
-          {/* On mobile, close button becomes a Radix DialogClose for proper focus return */}
-          <DialogClose asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden h-8 w-8"
-              aria-label="Close sidebar"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogClose>
+          {/* Plain button (not DialogClose): fullSidebarBody also renders on the
+              desktop path outside any Dialog, so a DialogClose here would throw.
+              onMobileClose drives the Dialog's open state; Radix still returns
+              focus on close. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden h-8 w-8"
+            onClick={onMobileClose}
+            aria-label="Close sidebar"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

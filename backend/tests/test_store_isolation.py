@@ -233,6 +233,13 @@ async def test_delete_document_all_queries_scoped_by_user_id() -> None:
     assert "user_id = :user_id" in select_sql
     assert select_params["user_id"] == "u-1"
 
+    # DELETE chunks must be scoped to the (already ownership-verified) document
+    # — never an unscoped/global delete.
+    delete_chunks_sql, delete_chunks_params = session.calls[1]
+    assert "DELETE FROM chunks" in delete_chunks_sql
+    assert "document_id = :id" in delete_chunks_sql
+    assert delete_chunks_params["id"] == "d-1"
+
     # DELETE documents also must be scoped by user_id.
     delete_doc_sql, delete_doc_params = session.calls[2]
     assert "user_id = :user_id" in delete_doc_sql

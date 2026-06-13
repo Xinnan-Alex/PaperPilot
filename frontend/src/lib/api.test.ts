@@ -53,6 +53,14 @@ describe("parseSSEStream", () => {
     ]);
   });
 
+  it("flushes a trailing data line that has no final newline", async () => {
+    // Stream closes mid-line without a terminating \n — the last event must
+    // still be emitted, not dropped.
+    const raw = `event: token\ndata: "tail"`;
+    const events = await collect(makeResponse([enc(raw)]));
+    expect(events).toEqual([{ type: "token", data: "tail" }]);
+  });
+
   it("yields a sources event as a parsed array", async () => {
     const sources = [
       {

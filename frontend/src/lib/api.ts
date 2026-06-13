@@ -236,6 +236,52 @@ export async function* parseSSEStream(
     return raw.startsWith(" ") ? raw.slice(1) : raw;
   }
 
+  // Process one SSE line, yielding an event for each complete `data:` line.
+  // Closes over `currentEvent` so the preceding `event:` line scopes it.
+  function* processLine(line: string): Generator<StreamEvent> {
+    // Ignore comment lines and blank lines (blank = dispatch boundary).
+    if (line === "" || line.startsWith(":")) return;
+
+    // event field — accept "event:" or "event: "
+    if (line.startsWith("event:")) {
+      currentEvent = fieldValue(line.slice(6)).trim();
+      return;
+    }
+
+    // data field — accept "data:" or "data: "
+    if (line.startsWith("data:")) {
+      const payload = fieldValue(line.slice(5));
+      if (currentEvent === "token") {
+        try {
+          yield { type: "token", data: JSON.parse(payload) as string };
+        } catch {
+          yield { type: "token", data: payload };
+        }
+      } else if (currentEvent === "sources") {
+        try {
+          yield { type: "sources", data: JSON.parse(payload) as SSESource[] };
+        } catch {
+          // skip malformed sources event
+        }
+      } else if (currentEvent === "tool_call") {
+        try {
+          yield { type: "tool_call", data: JSON.parse(payload) };
+        } catch {
+          // skip malformed tool_call event
+        }
+      } else if (currentEvent === "tool_result") {
+        try {
+          yield { type: "tool_result", data: JSON.parse(payload) };
+        } catch {
+          // skip malformed tool_result event
+        }
+      } else if (currentEvent === "done") {
+        yield { type: "done" };
+      }
+      currentEvent = "";
+    }
+  }
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -245,50 +291,14 @@ export async function* parseSSEStream(
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
-      for (const line of lines) {
-        // Ignore comment lines and blank lines (blank = dispatch boundary).
-        if (line === "" || line.startsWith(":")) continue;
-
-        // event field — accept "event:" or "event: "
-        if (line.startsWith("event:")) {
-          currentEvent = fieldValue(line.slice(6)).trim();
-          continue;
-        }
-
-        // data field — accept "data:" or "data: "
-        if (line.startsWith("data:")) {
-          const payload = fieldValue(line.slice(5));
-          if (currentEvent === "token") {
-            try {
-              yield { type: "token", data: JSON.parse(payload) as string };
-            } catch {
-              yield { type: "token", data: payload };
-            }
-          } else if (currentEvent === "sources") {
-            try {
-              yield { type: "sources", data: JSON.parse(payload) as SSESource[] };
-            } catch {
-              // skip malformed sources event
-            }
-          } else if (currentEvent === "tool_call") {
-            try {
-              yield { type: "tool_call", data: JSON.parse(payload) };
-            } catch {
-              // skip malformed tool_call event
-            }
-          } else if (currentEvent === "tool_result") {
-            try {
-              yield { type: "tool_result", data: JSON.parse(payload) };
-            } catch {
-              // skip malformed tool_result event
-            }
-          } else if (currentEvent === "done") {
-            yield { type: "done" };
-          }
-          currentEvent = "";
-        }
-      }
+      for (const line of lines) yield* processLine(line);
     }
+
+    // EOF: flush any bytes the decoder still holds and process the trailing
+    // line(s) — a stream that closes without a final newline would otherwise
+    // drop its last `data:` event.
+    buffer += normalizeLineEndings(decoder.decode());
+    for (const line of buffer.split("\n")) yield* processLine(line);
   } finally {
     reader.releaseLock();
   }
