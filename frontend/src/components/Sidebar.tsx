@@ -264,7 +264,7 @@ export default function Sidebar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1 top-1/2 z-10 h-7 w-8 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                    className="absolute right-1 top-1/2 z-10 h-7 w-8 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:-translate-y-1/2! active:scale-90 active:bg-destructive/15 active:text-destructive"
                     onClick={(e) => {
                       e.stopPropagation();
                       setConfirmDeleteId(session.id);
