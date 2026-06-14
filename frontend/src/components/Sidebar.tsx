@@ -257,14 +257,14 @@ export default function Sidebar({
                     )}
                   >
                     <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 truncate pr-5">
+                    <span className="flex-1 truncate pr-7">
                       {session.title}
                     </span>
                   </button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                    className="absolute right-1 top-1/2 z-10 h-7 w-8 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation();
                       setConfirmDeleteId(session.id);
