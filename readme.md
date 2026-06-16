@@ -319,7 +319,7 @@ paperpilot/
 | `GET` | `/me` | Current authenticated user |
 | `GET` | `/models` | List enabled providers + models (manifest- and env-gated); includes `default_model_id` |
 | `POST` | `/chat` | Agentic chat turn — returns SSE stream |
-| `POST` | `/upload` | Upload file to Supabase Storage |
+| `POST` | `/upload` | Upload file to object storage (Supabase or S3 per `STORAGE_BACKEND`) |
 | `POST` | `/ingest` | Trigger background ingestion |
 | `GET` | `/documents` | List user's documents |
 | `GET` | `/documents/{id}` | Get document status |
@@ -388,6 +388,12 @@ We use [cron-job.org](https://cron-job.org) (free, honours the interval):
 | `SUPABASE_JWKS_URL` | Yes | JWKS endpoint for JWT verification |
 | `SUPABASE_SECRET_KEY` | Yes | Backend secret key (bypasses RLS) |
 | `SUPABASE_DB_URL` | Yes | Postgres connection string |
+| `STORAGE_BACKEND` | No | Object storage backend: `supabase` (default) or `s3` |
+| `STORAGE_FALLBACK` | No | Fallback backend during migration (set `supabase` for S3 cutover reads) |
+| `S3_BUCKET` | S3 only | Target S3 bucket name (required when `STORAGE_BACKEND=s3`) |
+| `AWS_REGION` | S3 only | AWS region for the S3 client (required when `STORAGE_BACKEND=s3`) |
+| `AWS_ACCESS_KEY_ID` | S3 only | AWS access key ID |
+| `AWS_SECRET_ACCESS_KEY` | S3 only | AWS secret access key |
 | `VOYAGE_API_KEY` | Yes | Voyage AI embeddings key |
 | `DEEPSEEK_API_KEY` | LLM key* | Enables `deepseek-chat` |
 | `OPENAI_API_KEY` | LLM key* | Enables `gpt-4o` and `gpt-4o-mini` |

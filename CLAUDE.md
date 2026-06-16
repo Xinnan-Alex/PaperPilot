@@ -59,6 +59,7 @@ Each module has a single responsibility; they compose in `reader.py` and `api.py
 | `chunk.py` | Recursive semantic split (~800 chars, 100-char overlap). |
 | `embed.py` | Voyage AI `voyage-3-lite` API (512-dim). Batches 128 texts per call. |
 | `store.py` | Raw SQL via SQLAlchemy async — insert documents/chunks, update status, vector search, hard-delete document + chunks. |
+| `storage.py` | Object-storage abstraction. `get_storage()` returns a backend chosen by `STORAGE_BACKEND` (`supabase` httpx / `s3` boto3); both raise `StorageError`. `FallbackStorage` (when `STORAGE_FALLBACK=supabase`) reads S3, falls back to Supabase for not-yet-migrated objects during cutover. |
 | `retrieve.py` | Hybrid search (pgvector cosine + Postgres FTS, merged via Reciprocal Rank Fusion). `multi_query_search` fuses results across LLM-expanded query variants. |
 | `rerank.py` | Voyage `rerank-2-lite` reorders the fused candidate pool by query relevance. Degrades to identity order on failure. |
 | `query_rewrite.py` | One LLM call expands a query into variants for higher recall. Degrades to the original query. |
@@ -72,7 +73,9 @@ Each module has a single responsibility; they compose in `reader.py` and `api.py
 
 ### Document ingestion flow
 
-`POST /upload` → saves to Supabase Storage, inserts `documents` row as `pending` (deletes the orphaned Storage object if the insert fails) → `POST /ingest` → background task: extract → chunk → embed → insert chunks → update status to `ready`. Frontend polls `GET /documents/{id}` every 2s.
+`POST /upload` → saves to object storage (via `storage.py`, Supabase or S3 per `STORAGE_BACKEND`), inserts `documents` row as `pending` (deletes the orphaned object if the insert fails) → `POST /ingest` → background task: extract → chunk → embed → insert chunks → update status to `ready`. Frontend polls `GET /documents/{id}` every 2s.
+
+Storage migration (Supabase → S3) is a swap of `STORAGE_BACKEND`; both code paths coexist. `backend/scripts/migrate_storage_to_s3.py` backfills existing objects (idempotent). For zero-downtime cutover set `STORAGE_FALLBACK=supabase` so reads fall back until the backfill completes.
 
 The background task records a fine-grained `documents.stage` (`downloading` → `extracting` → `chunking` → `embedding` → `storing`) for live progress, persists a truncated `error_detail` on failure, and tracks `retry_count`/`updated_at`. Download and embed run off the event loop (`asyncio.to_thread`) with exponential-backoff retries; deterministic steps (extract) are not retried. `status` stays the coarse machine: `pending`/`processing`/`ready`/`failed`. Failed docs are re-ingestable (re-`POST /ingest` resets stage/error).
 
