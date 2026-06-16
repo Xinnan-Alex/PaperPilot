@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     supabase_db_url: str = ""
     supabase_storage_bucket: str = "documents"
 
+    # Object storage backend: "supabase" | "s3"
+    storage_backend: str = "supabase"
+    s3_bucket: str = "paperpilot-documents-prod-bazinga-bazonga"
+    aws_region: str = "ap-southeast-5"
+    # Set to "supabase" during migration: read S3, fall back to Supabase for
+    # not-yet-backfilled objects. Unset once backfill is complete.
+    storage_fallback: str = ""
+
     # Embeddings (Voyage)
     voyage_api_key: str = ""
     embedding_model: str = "voyage-3-lite"
@@ -61,7 +69,9 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
 
 settings = Settings()

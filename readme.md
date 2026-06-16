@@ -319,7 +319,7 @@ paperpilot/
 | `GET` | `/me` | Current authenticated user |
 | `GET` | `/models` | List enabled providers + models (manifest- and env-gated); includes `default_model_id` |
 | `POST` | `/chat` | Agentic chat turn — returns SSE stream |
-| `POST` | `/upload` | Upload file to Supabase Storage |
+| `POST` | `/upload` | Upload file to object storage (Supabase or S3 per `STORAGE_BACKEND`) |
 | `POST` | `/ingest` | Trigger background ingestion |
 | `GET` | `/documents` | List user's documents |
 | `GET` | `/documents/{id}` | Get document status |

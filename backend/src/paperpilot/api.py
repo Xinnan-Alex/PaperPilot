@@ -8,9 +8,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime, timezone
 from pathlib import PosixPath
 from typing import Any
-from urllib.parse import quote
 
-import httpx
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -39,6 +37,7 @@ from paperpilot.models import (
     QueryRequest,
 )
 from paperpilot.reader import answer
+from paperpilot.storage import StorageError, get_storage
 from paperpilot.store import (
     delete_document,
     get_document,
@@ -98,23 +97,6 @@ metrics: dict[str, float | int] = {
     "errors_total": 0,
     "latency_total_ms": 0.0,
 }
-
-
-def supabase_admin_headers(content_type: str | None = None) -> dict[str, str]:
-    headers: dict[str, str] = {"apikey": settings.supabase_secret_key}
-    if content_type:
-        headers["Content-Type"] = content_type
-    return headers
-
-
-def supabase_user_headers(access_token: str, content_type: str | None = None) -> dict[str, str]:
-    headers: dict[str, str] = {
-        "apikey": settings.supabase_publishable_key or settings.supabase_secret_key,
-        "Authorization": f"Bearer {access_token}",
-    }
-    if content_type:
-        headers["Content-Type"] = content_type
-    return headers
 
 
 def get_user_key(request: Request) -> str:
@@ -275,25 +257,24 @@ async def upload_file(
 
     original_filename = file.filename or f"upload{ext}"
     storage_path: str = f"{user_id}/{_uuid.uuid4()}{ext}"
-    upload_headers = supabase_user_headers(
-        access_token, file.content_type or "application/octet-stream"
-    )
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp: httpx.Response = await client.post(
-            f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
-            content=contents,
-            headers=upload_headers,
+    try:
+        await get_storage().upload(
+            storage_path,
+            contents,
+            file.content_type or "application/octet-stream",
+            access_token=access_token,
         )
-
-        if resp.status_code >= 400:
-            get_logger().error(
-                "storage_upload_failed",
-                user_id=user_id,
-                storage_path=storage_path,
-                status=resp.status_code,
-                body=resp.text[:500],
-            )
-            raise HTTPException(status_code=502, detail=f"Storage upload failed: {resp.text}")
+    except StorageError as exc:
+        get_logger().error(
+            "storage_upload_failed",
+            user_id=user_id,
+            storage_path=storage_path,
+            status=exc.status,
+            body=exc.body[:500],
+        )
+        raise HTTPException(
+            status_code=502, detail=f"Storage upload failed: {exc.body}"
+        ) from exc
 
     try:
         async for session in get_db():
@@ -306,12 +287,10 @@ async def upload_file(
             user_id=user_id,
             storage_path=storage_path,
         )
-        encoded_path = quote(storage_path, safe="/")
-        async with httpx.AsyncClient(timeout=10) as client:
-            await client.delete(
-                f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{encoded_path}",
-                headers=supabase_admin_headers(),
-            )
+        try:
+            await get_storage().delete(storage_path)
+        except StorageError:
+            pass  # best-effort orphan cleanup
         raise HTTPException(status_code=502, detail="Failed to record uploaded document")
 
     get_logger().info(
@@ -377,14 +356,7 @@ class _IngestError(Exception):
 
 async def _download_source(storage_path: str, log: Any) -> bytes:
     async def _attempt() -> bytes:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp: httpx.Response = await client.get(
-                f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{storage_path}",
-                headers=supabase_admin_headers(),
-            )
-        if resp.status_code >= 400:
-            raise RuntimeError(f"storage download {resp.status_code}: {resp.text[:200]}")
-        return resp.content
+        return await get_storage().download(storage_path)
 
     try:
         result: bytes = await _with_retry(_attempt, label="download", log=log)
@@ -543,21 +515,17 @@ async def delete_document_endpoint(
     if storage_path is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    encoded_path = quote(storage_path, safe="/")
-    async with httpx.AsyncClient(timeout=10) as client:
-        del_resp = await client.delete(
-            f"{settings.supabase_url}/storage/v1/object/{settings.supabase_storage_bucket}/{encoded_path}",
-            headers=supabase_admin_headers(),
+    try:
+        await get_storage().delete(storage_path)
+    except StorageError as exc:
+        get_logger().warning(
+            "storage_delete_failed",
+            user_id=user_id,
+            doc_id=doc_id,
+            storage_path=storage_path,
+            status=exc.status,
+            body=exc.body[:200],
         )
-        if del_resp.status_code >= 400:
-            get_logger().warning(
-                "storage_delete_failed",
-                user_id=user_id,
-                doc_id=doc_id,
-                storage_path=storage_path,
-                status=del_resp.status_code,
-                body=del_resp.text[:200],
-            )
 
     get_logger().info("document_deleted", user_id=user_id, doc_id=doc_id)
     return Response(status_code=204)
@@ -580,26 +548,22 @@ async def get_document_download_url(
             raise HTTPException(status_code=404, detail="Document not found")
         storage_path: str = row[0]
 
-    encoded_path = quote(storage_path, safe="/")
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(
-            f"{settings.supabase_url}/storage/v1/object/sign/{settings.supabase_storage_bucket}/{encoded_path}",
-            headers=supabase_admin_headers(),
-            json={"expiresIn": 300},
-        )
-    if resp.status_code >= 400:
+    try:
+        url = await get_storage().signed_url(storage_path, expires_in=300)
+    except StorageError as exc:
         get_logger().error(
             "signed_url_failed",
             user_id=user_id,
             doc_id=doc_id,
             storage_path=storage_path,
-            status=resp.status_code,
-            body=resp.text[:500],
+            status=exc.status,
+            body=exc.body[:500],
         )
-        raise HTTPException(status_code=502, detail=f"Signed URL failed: {resp.text}")
+        raise HTTPException(
+            status_code=502, detail=f"Signed URL failed: {exc.body}"
+        ) from exc
 
-    signed_path: str = resp.json().get("signedURL", "")
-    return {"url": f"{settings.supabase_url}/storage/v1{signed_path}"}
+    return {"url": url}
 
 
 @app.post("/query")
