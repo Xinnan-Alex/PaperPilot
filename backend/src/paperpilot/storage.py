@@ -110,6 +110,8 @@ class SupabaseStorage:
         if resp.status_code >= 400:
             raise StorageError(resp.status_code, resp.text)
         signed_path: str = resp.json().get("signedURL", "")
+        if not signed_path:
+            raise StorageError(resp.status_code, "Supabase response missing signedURL")
         return f"{settings.supabase_url}/storage/v1{signed_path}"
 
 
@@ -119,6 +121,10 @@ class S3Storage:
     def __init__(self) -> None:
         import boto3
 
+        if not settings.s3_bucket or not settings.aws_region:
+            raise RuntimeError(
+                "S3 storage requires S3_BUCKET and AWS_REGION to be set (STORAGE_BACKEND=s3)."
+            )
         self._client = boto3.client("s3", region_name=settings.aws_region)
         self._bucket = settings.s3_bucket
 
@@ -208,12 +214,20 @@ class FallbackStorage:
             return await self._f.download(path)
 
     async def delete(self, path: str) -> None:
-        # Object may live in either store mid-migration — best-effort both.
+        # Object may live in either store mid-migration — best-effort both, but
+        # surface a real outage: only stay silent if at least one delete worked
+        # or every failure was a 404 (object simply absent from that store).
+        deleted = False
+        last_non_404: StorageError | None = None
         for backend in (self._p, self._f):
             try:
                 await backend.delete(path)
-            except StorageError:
-                pass
+                deleted = True
+            except StorageError as exc:
+                if exc.status != 404:
+                    last_non_404 = exc
+        if not deleted and last_non_404 is not None:
+            raise last_non_404
 
     async def signed_url(self, path: str, expires_in: int = 300) -> str:
         if await self._p.exists(path):
@@ -233,6 +247,8 @@ def get_storage() -> StorageBackend:
             _backend = FallbackStorage(S3Storage(), SupabaseStorage())
         elif settings.storage_backend == "s3":
             _backend = S3Storage()
-        else:
+        elif settings.storage_backend == "supabase":
             _backend = SupabaseStorage()
+        else:
+            raise RuntimeError(f"Unsupported STORAGE_BACKEND: {settings.storage_backend!r}")
     return _backend

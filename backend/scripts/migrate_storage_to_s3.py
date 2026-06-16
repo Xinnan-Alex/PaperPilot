@@ -19,7 +19,6 @@ import asyncio
 import mimetypes
 import sys
 
-from botocore.exceptions import ClientError
 from sqlalchemy import text
 
 from paperpilot.db import async_session
@@ -32,16 +31,6 @@ async def _all_keys() -> list[str]:
         return [row[0] for row in result.fetchall() if row[0]]
 
 
-def _exists_in_s3(s3: S3Storage, key: str) -> bool:
-    try:
-        s3._client.head_object(Bucket=s3._bucket, Key=key)
-        return True
-    except ClientError as exc:
-        if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
-            return False
-        raise
-
-
 async def main(dry_run: bool) -> int:
     src = SupabaseStorage()
     dst = S3Storage()
@@ -51,7 +40,14 @@ async def main(dry_run: bool) -> int:
 
     copied = skipped = failed = 0
     for key in keys:
-        if _exists_in_s3(dst, key):
+        try:
+            exists = await dst.exists(key)
+        except StorageError as exc:
+            print(f"  FAIL   {key}  status={exc.status} {exc.body[:120]}")
+            failed += 1
+            continue
+
+        if exists:
             print(f"  skip   {key}  (already in S3)")
             skipped += 1
             continue

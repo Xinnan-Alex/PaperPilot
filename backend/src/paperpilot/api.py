@@ -272,9 +272,7 @@ async def upload_file(
             status=exc.status,
             body=exc.body[:500],
         )
-        raise HTTPException(
-            status_code=502, detail=f"Storage upload failed: {exc.body}"
-        ) from exc
+        raise HTTPException(status_code=502, detail="Storage upload failed") from exc
 
     try:
         async for session in get_db():
@@ -559,9 +557,7 @@ async def get_document_download_url(
             status=exc.status,
             body=exc.body[:500],
         )
-        raise HTTPException(
-            status_code=502, detail=f"Signed URL failed: {exc.body}"
-        ) from exc
+        raise HTTPException(status_code=502, detail="Signed URL generation failed") from exc
 
     return {"url": url}
 
