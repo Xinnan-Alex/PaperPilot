@@ -52,5 +52,6 @@ jobs:
               "docker pull '"${{ steps.ecr.outputs.registry }}"'/'"$ECR_REPO"':latest",
               "aws ssm get-parameters-by-path --path /paperpilot/ --with-decryption --region '"$AWS_REGION"' --query \"Parameters[].[Name,Value]\" --output text | sed \"s#/paperpilot/##\" | awk \"{print \\$1\\\"=\\\"\\$2}\" > /run/paperpilot.env",
               "docker rm -f paperpilot || true",
-              "docker run -d --name paperpilot --restart unless-stopped -p 10000:10000 --env-file /run/paperpilot.env '"${{ steps.ecr.outputs.registry }}"'/'"$ECR_REPO"':latest"
+              
+              "docker run -d --name paperpilot --restart unless-stopped -p 10000:10000 --env-file /run/paperpilot.env --log-driver=awslogs --log-opt awslogs-region=ap-southeast-5 --log-opt awslogs-group=/paperpilot/backend --log-opt awslogs-create-group=true '"${{ steps.ecr.outputs.registry }}"'/'"$ECR_REPO"':latest"
             ]'
