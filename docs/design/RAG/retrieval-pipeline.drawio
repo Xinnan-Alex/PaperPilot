@@ -1,0 +1,138 @@
+<mxfile host="Electron">
+  <diagram name="Retrieval-Pipeline" id="0">
+    <mxGraphModel dx="1310" dy="842" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1340" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#333333;" value="Retrieval pipeline detail — inside the search_documents tool" vertex="1">
+          <mxGeometry height="36" width="1080" x="40" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="voy" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;align=left;spacingLeft=10;" value="Voyage AI&#xa;— voyage-3-lite&#xa;   (query embeddings · 512-d)&#xa;— rerank-2-lite&#xa;   (cross-encoder reranker)" vertex="1">
+          <mxGeometry height="150" width="200" x="1110" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="db" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;align=left;spacingLeft=10;" value="Supabase Postgres + pgvector&#xa;chunks&#xa;— embedding (vector)&#xa;— search_vector (tsvector)" vertex="1">
+          <mxGeometry height="150" width="220" x="40" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="rrfnote" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;dashed=1;align=left;spacingLeft=8;" value="RRF&#xa;score(chunk) = Σ 1/(60 + rank)&#xa;over every list it appears in" vertex="1">
+          <mxGeometry height="90" width="200" x="1130" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="q" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontStyle=1;" value="User query" vertex="1">
+          <mxGeometry height="50" width="280" x="540" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="rw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="1.  Query rewrite (LLM)&#xa;enable_query_rewrite → up to 2 paraphrase variants" vertex="1">
+          <mxGeometry height="56" width="420" x="470" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="v0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Q0  (original)" vertex="1">
+          <mxGeometry height="44" width="180" x="360" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="v1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Q1  (variant)" vertex="1">
+          <mxGeometry height="44" width="180" x="590" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="v2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Q2  (variant)" vertex="1">
+          <mxGeometry height="44" width="180" x="820" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="embed" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="2.  Embed each variant — Voyage voyage-3-lite · input_type=query" vertex="1">
+          <mxGeometry height="44" width="640" x="360" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="hyb" parent="1" style="swimlane;startSize=34;html=1;whiteSpace=wrap;fillColor=#fffaf0;strokeColor=#d6b656;fontSize=13;fontStyle=1;fontColor=#8a6d00;verticalAlign=top;" value="3.  HYBRID SEARCH  —  runs once per query variant" vertex="1">
+          <mxGeometry height="230" width="700" x="340" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="dense" parent="hyb" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Dense / semantic&#xa;pgvector cosine  embedding &lt;=&gt; q&#xa;ANN · top k×2" vertex="1">
+          <mxGeometry height="70" width="280" x="40" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sparse" parent="hyb" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Sparse / lexical&#xa;Postgres FTS  websearch_to_tsquery&#xa;ts_rank_cd · top k×2" vertex="1">
+          <mxGeometry height="70" width="280" x="380" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="rrf1" parent="hyb" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="RRF merge (k=60)  →  fused top-k for this variant" vertex="1">
+          <mxGeometry height="56" width="400" x="150" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="mq" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="4.  Multi-query RRF fuse (across all variants)&#xa;→ candidate pool (≤30 unique chunks)" vertex="1">
+          <mxGeometry height="56" width="620" x="380" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="rr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="5.  Rerank — Voyage rerank-2-lite → top_k (5)&#xa;enable_rerank · identity-order fallback on error" vertex="1">
+          <mxGeometry height="56" width="620" x="380" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="trim" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="6.  Trim to context budget (≤8000 chars)&#xa;+ lexical citation spans  (best_span char offsets)" vertex="1">
+          <mxGeometry height="56" width="620" x="380" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="Ranked chunks  (text · filename · page · rerank_score · span)&#xa;→ agent → LLM answer over SSE, inline [N] citations" vertex="1">
+          <mxGeometry height="56" width="620" x="380" y="980" as="geometry" />
+        </mxCell>
+        <mxCell id="e_q_rw" edge="1" parent="1" source="q" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="rw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rw_v0" edge="1" parent="1" source="rw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="v0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rw_v1" edge="1" parent="1" source="rw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="v1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rw_v2" edge="1" parent="1" source="rw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="v2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_v0_em" edge="1" parent="1" source="v0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="embed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_v1_em" edge="1" parent="1" source="v1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="embed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_v2_em" edge="1" parent="1" source="v2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="embed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_em_hyb" edge="1" parent="1" source="embed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;fontSize=10;fontColor=#8a5a00;" target="hyb" value="per variant">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_d_rrf" edge="1" parent="1" source="dense" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="rrf1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_s_rrf" edge="1" parent="1" source="sparse" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="rrf1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hyb_mq" edge="1" parent="1" source="hyb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="mq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_mq_rr" edge="1" parent="1" source="mq" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="rr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rr_trim" edge="1" parent="1" source="rr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="trim">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_trim_out" edge="1" parent="1" source="trim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="x_em_voy" edge="1" parent="1" source="embed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.2;entryDx=0;entryDy=0;" target="voy" value="embed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="x_rr_voy" edge="1" parent="1" source="rr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0;" target="voy" value="rerank">
+          <mxGeometry relative="1" x="0.863" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_d_db" edge="1" parent="1" source="dense" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#82b366;fontSize=10;fontColor=#5a8a3a;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.35;entryDx=0;entryDy=0;" target="db" value="ANN read">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="x_s_db" edge="1" parent="1" source="sparse" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#82b366;fontSize=10;fontColor=#5a8a3a;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" target="db" value="FTS read">
+          <mxGeometry relative="1" x="0.8298" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="790" y="570" />
+              <mxPoint x="320" y="570" />
+              <mxPoint x="320" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_rrf_note" edge="1" parent="1" source="mq" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#d6b656;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="rrfnote">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="738" />
+              <mxPoint x="1080" y="655" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#555555;" value="solid = pipeline flow   ·   dashed = call to shared service   ·   yellow = retrieval primitive   ·   orange = stage   ·   purple = external API   ·   green = Postgres / output" vertex="1">
+          <mxGeometry height="30" width="1080" x="40" y="1070" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

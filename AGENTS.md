@@ -7,7 +7,8 @@ An agentic RAG document-QA app. FastAPI backend + React/Vite frontend + Supabase
 - `backend/` — Python 3.11 FastAPI app. Package root is `paperpilot` under `backend/src/`.
 - `frontend/` — React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui.
 - `supabase/migrations/` — Postgres schema migrations. Deployed by CI on push to `main`.
-- `render.yaml` — Render web service config (Docker, rootDir `backend/`).
+- `.github/workflows/` — CI: `supabase-prod.yml` (migrations), `react-doctor.yml`, `deploy-backend.yml` (ECR + EC2 via SSM), `deploy-frontend.yml` (S3 + CloudFront).
+- `render.yaml` — legacy Render config (pre-AWS), retained for reference only.
 
 ## Agent Loop
 
@@ -88,13 +89,19 @@ OpenAI account scoping: if your `OPENAI_API_KEY` is bound to an organization or 
 - Migrations live in `supabase/migrations/`.
 - CI workflow `.github/workflows/supabase-prod.yml` runs `supabase db push` on every push to `main`.
 - CI workflow `.github/workflows/react-doctor.yml` runs React Doctor (`--diff` mode) on every PR touching `frontend/`.
+- CI workflows `deploy-backend.yml` / `deploy-frontend.yml` deploy to AWS on push to `main` (see Deployment).
 - Local dev: use `supabase db push` or the Supabase CLI to apply migrations to your linked project.
 
 ## Deployment
 
-- **Frontend:** Vercel (static site, domain `paperpilot.leongxinnan.com`).
-- **Backend:** Render (Docker web service, domain `api.paperpilot.leongxinnan.com`, health check `/health`).
-- **Supabase:** Stores data, auth, and file storage.
+Hosted on **AWS** (region `ap-southeast-5`). GitHub Actions deploys both tiers on push to `main` via **GitHub OIDC → IAM role `paperpilot-ci`** — no AWS keys stored in GitHub.
+
+- **Frontend:** S3 static bucket + CloudFront (domain `paperpilot.leongxinnan.com`). `deploy-frontend.yml` → `pnpm build` → `aws s3 sync --delete` → CloudFront invalidation. `VITE_*` are build-time GitHub repo secrets.
+- **Backend:** EC2 `t4g` (ARM) running the Docker container on port 10000; image in **ECR**. `deploy-backend.yml` builds `linux/arm64` (QEMU on the x86 runner), pushes to ECR, then pulls + restarts on the box via **SSM Run Command** (no SSH). Domain `api.paperpilot.leongxinnan.com`, health check `/health`.
+- **Secrets + config:** **SSM Parameter Store** under `/paperpilot/*` (SecureString). The container fetches every param into `/run/paperpilot.env` at start (`aws ssm get-parameters-by-path --with-decryption`); non-secret config (e.g. `FRONTEND_ORIGINS`, `SUPABASE_URL`) lives there too — anything absent falls back to `config.py` defaults, which is the usual cause of CORS/JWKS failures on the box. No plaintext `.env` on EC2.
+- **Object storage:** S3 (`STORAGE_BACKEND=s3`); the EC2 instance profile grants bucket access, so no `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` in env.
+- **Observability:** container logs ship to CloudWatch `/paperpilot/backend` via the Docker `awslogs` driver; metric filter `{ $.level = "error" }` → CloudWatch alarm → SNS `paperpilot-alerts`. Logs are JSON when `ENV != local` (`logging.py`).
+- **Supabase:** still Postgres (pgvector) + Auth. File storage migrated off to S3.
 
 ## Local Dev Setup
 

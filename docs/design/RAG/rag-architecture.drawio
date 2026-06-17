@@ -1,0 +1,204 @@
+<mxfile host="Electron">
+  <diagram name="RAG-Architecture" id="0">
+    <mxGraphModel dx="949" dy="610" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#333333;" value="PaperPilot — RAG Architecture (ingestion write-path · query read-path · shared stores)" vertex="1">
+          <mxGeometry height="40" width="1480" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ing" parent="1" style="swimlane;startSize=40;html=1;whiteSpace=wrap;fillColor=#eef3fb;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;fontColor=#1f3b66;verticalAlign=top;" value="INGESTION  —  write path" vertex="1">
+          <mxGeometry height="700" width="440" x="40" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="1.  Upload file&#xa;POST /upload  —  PDF · DOCX · HTML · TXT" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="56" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="2.  Persist source&#xa;Supabase Storage  +  insert documents row (status=pending)" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="3.  POST /ingest  →  background task&#xa;_run_ingest_pipeline (stage: downloading→…→storing)" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="4.  Extract text&#xa;pypdf · python-docx · bs4  —  Tesseract OCR fallback" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="i5" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="5.  Chunk&#xa;recursive split  ~800 chars · 100 overlap" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="424" as="geometry" />
+        </mxCell>
+        <mxCell id="i6" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="6.  Embed chunks&#xa;Voyage voyage-3-lite · 512-d · input_type=document · batch 128" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="516" as="geometry" />
+        </mxCell>
+        <mxCell id="i7" parent="ing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="7.  Store chunks&#xa;pgvector embedding + FTS search_vector  →  status=ready" vertex="1">
+          <mxGeometry height="56" width="400" x="20" y="608" as="geometry" />
+        </mxCell>
+        <mxCell id="ie1" edge="1" parent="1" source="i1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" target="i2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie2" edge="1" parent="1" source="i2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" target="i3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie3" edge="1" parent="1" source="i3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" target="i4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie4" edge="1" parent="1" source="i4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" target="i5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie5" edge="1" parent="1" source="i5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" target="i6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ie6" edge="1" parent="1" source="i6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" target="i7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="voy" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" value="Voyage AI&#xa;— voyage-3-lite  (embeddings · 512-d)&#xa;— rerank-2-lite  (reranker)" vertex="1">
+          <mxGeometry height="90" width="300" x="600" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="db" parent="1" style="swimlane;startSize=34;html=1;whiteSpace=wrap;fillColor=#eaf5e6;strokeColor=#82b366;fontSize=13;fontStyle=1;fontColor=#28612a;verticalAlign=top;" value="Supabase Postgres + pgvector" vertex="1">
+          <mxGeometry height="170" width="340" x="580" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="db_docs" parent="db" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="documents&#xa;(status · stage)" vertex="1">
+          <mxGeometry height="90" width="130" x="24" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="db_chunks" parent="db" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;align=center;" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;chunks&lt;br&gt;embedding (vector)&lt;br&gt;search_vector (tsvector)" vertex="1">
+          <mxGeometry height="90" width="130" x="186" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" value="LLM providers (LiteLLM)&#xa;DeepSeek deepseek-chat  (default)&#xa;OpenAI · Groq · Mistral" vertex="1">
+          <mxGeometry height="90" width="300" x="600" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="qry" parent="1" style="swimlane;startSize=40;html=1;whiteSpace=wrap;fillColor=#fff6ec;strokeColor=#d79b00;fontSize=14;fontStyle=1;fontColor=#8a5a00;verticalAlign=top;" value="QUERY  /  RETRIEVAL  —  read path  (search_documents tool)" vertex="1">
+          <mxGeometry height="880" width="560" x="1011" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="q1" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="1.  POST /query · /chat  (SSE)&#xa;Agent loop — up to 5 tool iterations" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="56" as="geometry" />
+        </mxCell>
+        <mxCell id="q2" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="2.  Tool call:  search_documents(query, top_k)" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="q3" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="3.  Query rewrite (multi-query)&#xa;LLM expands → up to 2 paraphrase variants  [enable_query_rewrite]" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="224" as="geometry" />
+        </mxCell>
+        <mxCell id="q4" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="4.  Embed queries&#xa;Voyage voyage-3-lite · input_type=query  (original + variants)" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="308" as="geometry" />
+        </mxCell>
+        <mxCell id="qhl" parent="qry" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=2;" value="5.  HYBRID SEARCH  —  run per query variant" vertex="1">
+          <mxGeometry height="30" width="520" x="20" y="388" as="geometry" />
+        </mxCell>
+        <mxCell id="q5a" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Dense / semantic&#xa;pgvector cosine  embedding &lt;=&gt; q&#xa;top k×2" vertex="1">
+          <mxGeometry height="64" width="250" x="20" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="q5b" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Sparse / lexical&#xa;Postgres FTS websearch_to_tsquery&#xa;ts_rank_cd · top k×2" vertex="1">
+          <mxGeometry height="64" width="250" x="290" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="q6" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="RRF fuse (k=60)  per-variant, then across variants&#xa;→ candidate pool (≤30 unique chunks)" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="q7" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="6.  Rerank&#xa;Voyage rerank-2-lite → top_k (5)  [enable_rerank · identity fallback]" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="604" as="geometry" />
+        </mxCell>
+        <mxCell id="q8" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="7.  Trim to context budget (≤8000 chars)&#xa;+ lexical citation spans  (best_span char offsets)" vertex="1">
+          <mxGeometry height="50" width="520" x="20" y="688" as="geometry" />
+        </mxCell>
+        <mxCell id="q9" parent="qry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" value="8.  Generate answer&#xa;LLM streams over chunks → SSE  token · sources · done  (inline [N] citations)" vertex="1">
+          <mxGeometry height="56" width="520" x="20" y="772" as="geometry" />
+        </mxCell>
+        <mxCell id="qe1" edge="1" parent="1" source="q1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="q2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe2" edge="1" parent="1" source="q2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="q3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe3" edge="1" parent="1" source="q3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="q4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe4" edge="1" parent="1" source="q4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="qhl">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe5a" edge="1" parent="1" source="qhl" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="q5a">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe5b" edge="1" parent="1" source="qhl" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="q5b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe6a" edge="1" parent="1" source="q5a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="q6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe6b" edge="1" parent="1" source="q5b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;" target="q6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe7" edge="1" parent="1" source="q6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="q7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe8" edge="1" parent="1" source="q7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="q8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="qe9" edge="1" parent="1" source="q8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" target="q9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="x_i6_voy" edge="1" parent="1" source="i6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="voy" value="embed">
+          <mxGeometry relative="1" x="0.8257" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="500" y="664" />
+              <mxPoint x="500" y="345" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_i7_db" edge="1" parent="1" source="i7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#82b366;fontSize=10;fontColor=#5a8a3a;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="db" value="write chunks">
+          <mxGeometry relative="1" x="0.7507" y="5" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_q3_llm" edge="1" parent="1" source="q3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.15;entryDx=0;entryDy=0;" target="llm" value="rewrite">
+          <mxGeometry relative="1" x="0.8945" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1020" y="369" />
+              <mxPoint x="1020" y="770" />
+              <mxPoint x="940" y="770" />
+              <mxPoint x="940" y="734" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_q4_voy" edge="1" parent="1" source="q4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="voy" value="embed &lt;br&gt;query">
+          <mxGeometry relative="1" x="0.6653" y="-5" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_q5a_db" edge="1" parent="1" source="q5a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#82b366;fontSize=10;fontColor=#5a8a3a;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.35;entryDx=0;entryDy=0;" target="db" value="vector &lt;br&gt;read">
+          <mxGeometry relative="1" x="0.633" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="990" y="582" />
+              <mxPoint x="990" y="530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_q5b_db" edge="1" parent="1" source="q5b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#82b366;fontSize=10;fontColor=#5a8a3a;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" target="db" value="FTS read">
+          <mxGeometry relative="1" x="0.7052" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1352" y="614" />
+              <mxPoint x="1352" y="634" />
+              <mxPoint x="940" y="634" />
+              <mxPoint x="940" y="589" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_q7_voy" edge="1" parent="1" source="q7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.85;entryDx=0;entryDy=0;" target="voy" value="rerank">
+          <mxGeometry relative="1" x="0.8411" y="4" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="980" y="749" />
+              <mxPoint x="980" y="376" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="x_q9_llm" edge="1" parent="1" source="q9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9673a6;fontSize=10;fontColor=#9673a6;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.85;entryDx=0;entryDy=0;" target="llm" value="generate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="leg" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#555555;" value="Legend:  solid = pipeline flow   ·   dashed = call to shared service   ·   blue = ingestion   ·   orange = query   ·   yellow = retrieval primitive   ·   purple = external API   ·   green = Postgres" vertex="1">
+          <mxGeometry height="30" width="1480" x="40" y="1040" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -8,7 +8,7 @@ PaperPilot is a RAG document-QA app. Upload PDFs/DOCX, ask questions, get stream
 
 **Stack:** Python 3.11 FastAPI backend · React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui frontend · `streamdown` for LLM-streaming markdown · Supabase (Postgres + pgvector + Auth + Storage) · Voyage AI embeddings · DeepSeek LLM
 
-**Infra:** Vercel (frontend) · Render via Docker (backend, port 10000) · Supabase CI migrations
+**Infra (AWS, region `ap-southeast-5`):** S3 + CloudFront (frontend) · EC2 `t4g` ARM Docker via ECR (backend, port 10000) · S3 object storage · SSM Parameter Store (secrets) · CloudWatch (logs/alarms) · GitHub Actions + OIDC CI/CD · Supabase (Postgres + pgvector + Auth; storage migrated to S3)
 
 ---
 
@@ -44,6 +44,25 @@ supabase db push    # apply migrations to hosted Supabase project
 ```
 
 CI (`supabase-prod.yml`) runs `supabase db push` automatically on every push to `main`.
+
+---
+
+## Infrastructure (AWS)
+
+Hosted on AWS in region `ap-southeast-5`. GitHub Actions deploys on push to `main` via **GitHub OIDC → IAM role `paperpilot-ci`** — no AWS keys stored in GitHub.
+
+| Piece | Detail |
+|-------|--------|
+| Frontend | S3 static bucket + CloudFront (`paperpilot.leongxinnan.com`). `deploy-frontend.yml`: `pnpm build` → `aws s3 sync --delete` → CloudFront invalidation. |
+| Backend | EC2 `t4g` (ARM) runs the Docker container on port 10000; image in **ECR**. `deploy-backend.yml`: build `linux/arm64` (QEMU on the runner) → push ECR → restart on the box via **SSM Run Command**. Domain `api.paperpilot.leongxinnan.com`, health `/health`. |
+| Object storage | S3 (`STORAGE_BACKEND=s3`); EC2 instance profile grants bucket access — no AWS keys in env. |
+| Secrets + config | **SSM Parameter Store** under `/paperpilot/*` (SecureString). Container fetches all params into `/run/paperpilot.env` at start; non-secret config lives there too. No plaintext `.env` on the box. |
+| Observability | Container logs → CloudWatch `/paperpilot/backend` via Docker `awslogs` driver. Metric filter `{ $.level = "error" }` → alarm → SNS `paperpilot-alerts`. (Backend logs are JSON when `ENV != local`.) |
+| Supabase | Still Postgres + pgvector + Auth. Storage migrated off to S3. |
+
+`render.yaml` is legacy (pre-AWS Render config), kept for reference only.
+
+Architecture diagram: [docs/design/infra/aws-architecture.svg](docs/design/infra/aws-architecture.svg) (editable source `aws-architecture.drawio`).
 
 ---
 

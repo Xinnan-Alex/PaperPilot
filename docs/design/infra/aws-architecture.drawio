@@ -1,0 +1,163 @@
+<mxfile host="Electron">
+  <diagram name="PaperPilot AWS Architecture" id="0">
+    <mxGraphModel dx="1019" dy="655" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="aws" parent="1" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#f2f7fc;strokeColor=#147eba;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" value="AWS Cloud · ap-southeast-5" vertex="1">
+          <mxGeometry height="620" width="780" x="360" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="cf" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;" value="CloudFront" vertex="1">
+          <mxGeometry height="48" width="48" x="60" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="s3fe" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" value="S3 — frontend&#xa;(static SPA)" vertex="1">
+          <mxGeometry height="48" width="48" x="60" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="ecr" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecr;" value="ECR&#xa;(arm64 image)" vertex="1">
+          <mxGeometry height="48" width="48" x="320" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;" value="EC2 t4g (ARM)&#xa;Docker :10000&#xa;api.paperpilot…" vertex="1">
+          <mxGeometry height="48" width="48" x="320" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="ssm" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.parameter_store;" value="SSM Parameter Store&#xa;/paperpilot/* (SecureString)" vertex="1">
+          <mxGeometry height="48" width="48" x="580" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s3obj" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" value="S3 — object storage&#xa;(PDF/DOCX)" vertex="1">
+          <mxGeometry height="48" width="48" x="580" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="cw" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch_2;" value="CloudWatch Logs&#xa;/paperpilot/backend" vertex="1">
+          <mxGeometry height="48" width="48" x="580" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="sns" parent="aws" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;" value="SNS&#xa;paperpilot-alerts" vertex="1">
+          <mxGeometry height="48" width="48" x="580" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="User Browser&#xa;paperpilot.leongxinnan.com" vertex="1">
+          <mxGeometry height="60" width="190" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ci" parent="1" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;" value="CI/CD — GitHub Actions &lt;br&gt;(OIDC, no stored keys)" vertex="1">
+          <mxGeometry height="240" width="250" x="40" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="repo" parent="ci" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" value="GitHub repo&#xa;Xinnan-Alex/PaperPilot" vertex="1">
+          <mxGeometry height="55" width="170" x="40" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="actions" parent="ci" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" value="Workflows&#xa;deploy-backend.yml&#xa;deploy-frontend.yml" vertex="1">
+          <mxGeometry height="75" width="170" x="40" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="email" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" value="Email alert" vertex="1">
+          <mxGeometry height="50" width="120" x="1180" y="538" as="geometry" />
+        </mxCell>
+        <mxCell id="ext" parent="1" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;" value="External Services (non-AWS)" vertex="1">
+          <mxGeometry height="150" width="480" x="360" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="supabase" parent="ext" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="Supabase&#xa;Postgres + pgvector · Auth (JWKS)" vertex="1">
+          <mxGeometry height="65" width="190" x="30" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="apis" parent="ext" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" value="LLM / Embeddings APIs&#xa;DeepSeek · Voyage AI" vertex="1">
+          <mxGeometry height="65" width="200" x="250" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="e_repo_act" edge="1" parent="1" source="repo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" target="actions" value="push → main">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_act_s3fe" edge="1" parent="1" source="actions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="s3fe" value="pnpm build &lt;br&gt;→ s3 sync">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_act_ecr" edge="1" parent="1" source="actions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" target="ecr" value="build arm64 → push">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="300" y="492" />
+              <mxPoint x="300" y="160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_act_ec2" edge="1" parent="1" source="actions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;strokeColor=#d79b00;" target="ec2" value="SSM Run Command (restart)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="165" y="610" />
+              <mxPoint x="600" y="610" />
+              <mxPoint x="600" y="354" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_s3fe_cf" edge="1" parent="1" source="s3fe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" target="cf" value="origin">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="490" y="314.0000000000002" />
+              <mxPoint x="490" y="110.00000000000011" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_cf_browser" edge="1" parent="1" source="cf" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" target="browser" value="HTTPS (SPA)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_browser_ec2" edge="1" parent="1" source="browser" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ec2" value="API (SSE)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="20" y="110" />
+              <mxPoint x="20" y="630" />
+              <mxPoint x="640" y="630" />
+              <mxPoint x="640" y="354" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ecr_ec2" edge="1" parent="1" source="ecr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ec2" value="docker pull">
+          <mxGeometry relative="1" x="0.7638" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="750" y="144" />
+              <mxPoint x="750" y="249" />
+              <mxPoint x="704" y="249" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ec2_ssm" edge="1" parent="1" source="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ssm" value="fetch secrets">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ec2_s3obj" edge="1" parent="1" source="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="s3obj" value="objects">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="354" />
+              <mxPoint x="910" y="284" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ec2_cw" edge="1" parent="1" source="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="cw" value="logs (awslogs)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_cw_sns" edge="1" parent="1" source="cw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="sns" value="error alarm">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1020" y="424" />
+              <mxPoint x="1020" y="520" />
+              <mxPoint x="964" y="520" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_sns_email" edge="1" parent="1" source="sns" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" target="email" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ec2_supa" edge="1" parent="1" source="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="supabase" value="SQL + Auth">
+          <mxGeometry relative="1" x="0.5639" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="650" y="354" />
+              <mxPoint x="650" y="690" />
+              <mxPoint x="320" y="690" />
+              <mxPoint x="320" y="788" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ec2_apis" edge="1" parent="1" source="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="apis" value="LLM + embeddings">
+          <mxGeometry relative="1" x="0.324" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="760" y="354" />
+              <mxPoint x="760" y="690" />
+              <mxPoint x="880" y="690" />
+              <mxPoint x="880" y="788" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

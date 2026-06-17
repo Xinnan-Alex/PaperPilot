@@ -41,8 +41,8 @@
 
 ```mermaid
 graph TD
-    A[User Browser] -->|HTTPS / SSE| B[Frontend<br/>Vercel]
-    B --> C[Backend API<br/>Render]
+    A[User Browser] -->|HTTPS / SSE| B[Frontend<br/>S3 + CloudFront]
+    B --> C[Backend API<br/>EC2 t4g · Docker]
 
     C --> D[Supabase Storage]
     C --> E[Supabase Auth<br/>JWT / JWKS]
@@ -68,6 +68,14 @@ graph TD
 
     C --> AL
 ```
+
+### Infrastructure (AWS)
+
+Deployed on AWS (`ap-southeast-5`); GitHub Actions ships both tiers on push to `main` via GitHub OIDC. Full topology — CI/CD, frontend (S3 + CloudFront), backend (ECR → EC2 via SSM), secrets (SSM Parameter Store), object storage (S3), and observability (CloudWatch → SNS):
+
+![PaperPilot AWS architecture](docs/design/infra/aws-architecture.drawio.png)
+
+> Editable source: [aws-architecture.drawio](docs/design/infra/aws-architecture.drawio) · [SVG](docs/design/infra/aws-architecture.svg)
 
 ### Document Upload & Ingestion Flow
 
@@ -195,8 +203,8 @@ sequenceDiagram
 | **Embeddings** | Voyage AI `voyage-3-lite` |
 | **Web Search** | Tavily API (optional) |
 | **OCR** | Tesseract + `pdf2image` |
-| **Infra** | Vercel (frontend), Render (backend), Supabase (data/auth/storage) |
-| **CI/CD** | GitHub Actions (Supabase migrations) |
+| **Infra** | AWS `ap-southeast-5` — S3 + CloudFront (frontend), EC2 `t4g`/ECR (backend), S3 (object storage), SSM Parameter Store (secrets), CloudWatch + SNS (logs/alarms); Supabase (data/auth) |
+| **CI/CD** | GitHub Actions + OIDC — backend (ECR → EC2 via SSM Run Command), frontend (S3 + CloudFront), Supabase migrations |
 
 ---
 
@@ -315,7 +323,7 @@ paperpilot/
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Health check (Render) |
+| `GET` | `/health` | Health check |
 | `GET` | `/me` | Current authenticated user |
 | `GET` | `/models` | List enabled providers + models (manifest- and env-gated); includes `default_model_id` |
 | `POST` | `/chat` | Agentic chat turn — returns SSE stream |
@@ -343,33 +351,19 @@ paperpilot/
 
 ## Deployment
 
-### Frontend (Vercel)
+Deployed on **AWS** (`ap-southeast-5`). GitHub Actions deploys both tiers on push to `main` via **GitHub OIDC → IAM role `paperpilot-ci`** — no AWS keys stored in GitHub. See the [architecture diagram](#infrastructure-aws) above.
 
-1. Import the `frontend/` directory into Vercel.
-2. Set environment variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`.
-3. Deploy.
+### Frontend (S3 + CloudFront)
 
-### Backend (Render)
+`deploy-frontend.yml` on push to `main`: `pnpm build` → `aws s3 sync dist/ --delete` → CloudFront invalidation. `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` are build-time GitHub repo secrets. Domain `paperpilot.leongxinnan.com`.
 
-1. Push `render.yaml` to Render Blueprints, or create a Docker web service from the `backend/` directory.
-2. Set all `sync: false` environment variables in the Render Dashboard.
-3. Health check: `/health` on port `10000`.
+### Backend (EC2 + ECR)
 
-#### Keep-warm (avoiding cold starts)
+`deploy-backend.yml` on push to `main`: build `linux/arm64` (QEMU on the runner) → push to **ECR** → restart on the EC2 `t4g` box via **SSM Run Command** (no SSH). The container pulls config from **SSM Parameter Store** (`/paperpilot/*`, SecureString) into an env file at start — no plaintext `.env` on the box. The EC2 instance profile grants S3 object-storage access (no AWS keys in env). Always-on, so no cold starts. Domain `api.paperpilot.leongxinnan.com`, health check `/health` on port `10000`.
 
-Render's free tier spins the container down after **15 minutes** of inactivity; the next request then eats a ~30–60s cold start. To keep it warm, an external uptime monitor pings `/health` on a fixed interval.
+### Observability
 
-We use [cron-job.org](https://cron-job.org) (free, honours the interval):
-
-1. Sign up and verify your email.
-2. **Create cronjob** → **Title:** `paperpilot keep-warm`.
-3. **URL:** `https://<your-render-url>/health`
-4. **Request method:** GET.
-5. **Schedule:** every 10 minutes (stay under the 15-min idle window).
-6. **Expected status:** 200 (enables failure alerts).
-7. Save, enable, and use **Test run** to confirm a 200.
-
-> Permanent fix without any pinger: upgrade Render to the **Starter** tier ($7/mo), which has no spin-down.
+Container logs ship to CloudWatch (`/paperpilot/backend`) via the Docker `awslogs` driver; a metric filter on `{ $.level = "error" }` feeds a CloudWatch alarm → SNS `paperpilot-alerts`.
 
 ### Database (Supabase)
 
