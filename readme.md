@@ -77,6 +77,8 @@ Deployed on AWS (`ap-southeast-5`); GitHub Actions ships both tiers on push to `
 
 > Editable source: [aws-architecture.drawio](docs/design/infra/aws-architecture.drawio) · [SVG](docs/design/infra/aws-architecture.svg)
 
+These resources are managed as code in [`infra/`](infra/) (Terraform, remote state in S3) — imported from the console-created originals. PRs run `terraform plan` (posted as a comment); merges to `main` run `terraform apply`, both via GitHub OIDC.
+
 ### Document Upload & Ingestion Flow
 
 ```mermaid

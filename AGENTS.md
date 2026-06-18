@@ -102,6 +102,7 @@ Hosted on **AWS** (region `ap-southeast-5`). GitHub Actions deploys both tiers o
 - **Object storage:** S3 (`STORAGE_BACKEND=s3`); the EC2 instance profile grants bucket access, so no `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` in env.
 - **Observability:** container logs ship to CloudWatch `/paperpilot/backend` via the Docker `awslogs` driver; metric filter `{ $.level = "error" }` → CloudWatch alarm → SNS `paperpilot-alerts`. Logs are JSON when `ENV != local` (`logging.py`).
 - **Supabase:** still Postgres (pgvector) + Auth. File storage migrated off to S3.
+- **Infra as code:** AWS resources are imported into Terraform under `infra/` (remote state in S3). `terraform.yml` plans on PRs, applies on merge to `main` (OIDC roles `paperpilot-tf-plan` / `paperpilot-tf-apply`). SSM secret values and the Supabase DB are intentionally out of Terraform.
 
 ## Local Dev Setup
 
