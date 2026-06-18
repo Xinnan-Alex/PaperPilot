@@ -62,6 +62,10 @@ Hosted on AWS in region `ap-southeast-5`. GitHub Actions deploys on push to `mai
 
 `render.yaml` is legacy (pre-AWS Render config), kept for reference only.
 
+### Terraform (`infra/`)
+
+AWS resources are managed as code in `infra/` (flat root module, remote state in S3). Built **console-first, then imported** — every resource born from console clicks, adopted via `import` blocks. Covers S3 (docs + frontend), EC2 + SG + EIP, ECR, CloudFront + OAC + ACM, and IAM (instance role, GitHub OIDC, CI roles). **Not** managed: the 25 SSM params (secret values stay out of state) and the Supabase DB (RDS deliberately skipped). `.github/workflows/terraform.yml`: PR → `plan` (read-only role `paperpilot-tf-plan`) posted as a comment; merge to `main` → `apply` (`paperpilot-tf-apply`, admin, main-only). Both via GitHub OIDC, no stored keys.
+
 Architecture diagram: [docs/design/infra/aws-architecture.svg](docs/design/infra/aws-architecture.svg) (editable source `aws-architecture.drawio`).
 
 ---
