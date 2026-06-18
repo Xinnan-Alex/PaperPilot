@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import ChatBox from "@/components/ChatBox";
 import UploadBox from "@/components/UploadBox";
 import Sidebar from "@/components/Sidebar";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { useChatSessions } from "@/hooks/useChatSessions";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -91,6 +92,16 @@ export default function AppPage() {
             className="w-full max-w-sm p-0 overflow-y-auto"
             title="Documents"
           >
+            <DialogClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 z-10 h-8 w-8"
+                aria-label="Close documents"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogClose>
             <UploadBox
               onDocDeleted={handleDocDeleted}
               onDocsChanged={handleDocsChanged}
