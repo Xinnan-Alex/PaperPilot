@@ -6,6 +6,9 @@ import "./index.css";
 import App from "./App.tsx";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ModelProvider } from "./components/ModelProvider";
+import { registerDeepLinkAuth } from "./native/deepLinkAuth";
+
+registerDeepLinkAuth();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
