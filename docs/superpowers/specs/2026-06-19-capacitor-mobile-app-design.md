@@ -55,6 +55,36 @@ build time. A convenience wrapper script (e.g. `mobile/scripts/build-web.sh` or
 an `.env.mobile` file consumed by the frontend build) MAY be added to avoid
 retyping the env — decided during implementation, not required by this design.
 
+## Auth — native OAuth deep link (REQUIRED for v1)
+
+The web app authenticates with **OAuth only** (GitHub + Google) via
+`supabase.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } })`.
+There is **no email/password login**. In a Capacitor WebView, `window.location.origin`
+is `capacitor://localhost` / `http://localhost`, so the OAuth provider redirect
+never returns to the app and login dead-ends. Native OAuth via a **deep link** is
+therefore mandatory for v1 — there is no email/password path to fall back to.
+
+Pieces:
+
+1. **Plugins:** `@capacitor/browser` (open the OAuth URL in the system browser)
+   and `@capacitor/app` (receive the redirect via the `appUrlOpen` listener).
+2. **Custom URL scheme:** `com.leongxinnan.paperpilot://login-callback`,
+   registered in iOS `Info.plist` and an Android intent filter (Capacitor wires
+   these from config).
+3. **Supabase dashboard (manual, done by the user):** add the scheme above to
+   Auth → URL Configuration → Redirect URLs; confirm Google + GitHub provider
+   config allows it.
+4. **Supabase client:** create with `auth: { flowType: 'pkce', detectSessionInUrl: false }`
+   for native. On `appUrlOpen`, pass the callback URL to
+   `supabase.auth.exchangeCodeForSession(url)` to complete the session.
+5. **`Login.tsx` (additive, web behavior unchanged):**
+   `redirectTo = Capacitor.isNativePlatform() ? 'com.leongxinnan.paperpilot://login-callback' : window.location.origin`.
+   The `appUrlOpen` handler lives in app bootstrap (e.g. `main.tsx`), native-only.
+
+This slightly dents "frontend untouched": a platform conditional on `redirectTo`
+and a native-only `appUrlOpen` handler are added to `frontend/`. Both are
+additive and gated on `Capacitor.isNativePlatform()`; the web build is identical.
+
 ## Required changes outside `mobile/`
 
 1. **Backend CORS (`backend/.../api.py`).** Native WebView origin is
@@ -75,16 +105,12 @@ retyping the env — decided during implementation, not required by this design.
 - **File upload** (`<input type=file>`) — iOS needs `NSPhotoLibraryUsageDescription`
   / `NSCameraUsageDescription` strings in `Info.plist`; Android needs the
   file/photo picker to resolve. Confirm a PDF upload completes.
-- **Auth session persistence** — Supabase email/password login persists across
-  app restarts in the WebView.
+- **Auth round-trip** — OAuth deep-link login completes (browser → redirect →
+  `exchangeCodeForSession`) and the session persists across app restarts.
 
 ## Out of scope (v1)
 
 - **Ionic Framework UI components** — explicitly not used.
-- **Native Google OAuth.** Web redirect OAuth breaks inside a WebView. Native
-  needs a deep-link redirect (`@capacitor/browser` + custom URL scheme) or a
-  native Google sign-in plugin. v1 ships **email/password only**; native OAuth
-  is a documented follow-up.
 - Native push notifications.
 - App Store / Play Store submission, signing, provisioning profiles.
 - Custom splash screen / app icon polish — Capacitor defaults for v1.
@@ -96,13 +122,12 @@ retyping the env — decided during implementation, not required by this design.
 
 - `npx cap run ios` and `npx cap run android` launch PaperPilot in their
   respective simulators.
-- A user can log in (email/password), upload a PDF, and get a streaming answer
-  with citations — same behavior as web.
+- A user can log in (Google or GitHub OAuth via deep link), upload a PDF, and
+  get a streaming answer with citations — same behavior as web.
 - Web deployment is unaffected (no change to `frontend/` source or its CI).
 
 ## Follow-ups (post-v1, separate specs)
 
-- Native Google OAuth via deep links.
 - App icon + splash branding.
 - Store submission pipeline.
 - Capacitor plugins for native niceties (status bar, haptics, share sheet).
