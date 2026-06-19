@@ -304,7 +304,7 @@ paperpilot/
 │   │   │   ├── ToolCallBubble.tsx   # Inline tool activity display
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── UploadBox.tsx
-│   │   │   ├── BrandMark.tsx        # Shared paper-plane logo (sidebar, chat empty-state, landing)
+│   │   │   ├── BrandMark.tsx        # Shared pen-nib logo (sidebar, chat empty-state, landing)
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── hooks/
 │   │   │   ├── useChatSessions.ts
