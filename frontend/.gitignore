@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor native build artifacts
+ios/App/Pods
+ios/App/App/public
+ios/App/Podfile.lock
+android/.gradle
+android/app/build
+android/app/src/main/assets/public
+android/capacitor-cordova-android-plugins
+.env.mobile
+.env.mobile.local
