@@ -45,5 +45,18 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.leongxinnan.paperpilot</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PaperPilot needs photo access to attach documents.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PaperPilot needs camera access to capture documents.</string>
 </dict>
 </plist>
