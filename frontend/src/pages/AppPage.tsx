@@ -42,14 +42,14 @@ export default function AppPage() {
 
   if (loading) {
     return (
-      <div className="flex h-svh items-center justify-center">
+      <div className="app-shell flex h-svh items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-svh w-full overflow-hidden bg-background">
+    <div className="app-shell flex h-svh w-full overflow-hidden bg-background">
       {/* Sidebar: desktop renders inline; mobile uses Radix Dialog inside Sidebar */}
       <Sidebar
         sessions={sessions}
@@ -96,7 +96,7 @@ export default function AppPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-2 z-10 h-8 w-8"
+                className="absolute right-2 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-10 h-8 w-8"
                 aria-label="Close documents"
               >
                 <X className="h-4 w-4" />
