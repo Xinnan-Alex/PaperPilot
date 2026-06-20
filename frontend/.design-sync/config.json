@@ -1,0 +1,36 @@
+{
+  "projectId": "2de5a6a0-fcd5-4786-806d-52173c456485",
+  "shape": "package",
+  "pkg": "paperpilot",
+  "globalName": "PaperPilot",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.app.json",
+  "cssEntry": ".design-sync/compiled.css",
+  "buildCmd": ".ds-sync/node_modules/.bin/tailwindcss -i src/index.css -o .design-sync/compiled.css --minify",
+  "readmeHeader": ".design-sync/conventions.md",
+  "extraFonts": ["node_modules/@fontsource-variable/geist/index.css"],
+  "runtimeFontPrefixes": ["Fraunces"],
+  "componentSrcMap": {
+    "Button": "src/components/ui/button.tsx",
+    "Badge": "src/components/ui/badge.tsx",
+    "Skeleton": "src/components/ui/skeleton.tsx",
+    "Dialog": "src/components/ui/dialog.tsx",
+    "DropdownMenu": "src/components/ui/dropdown-menu.tsx",
+    "AlertDialog": "src/components/ui/alert-dialog.tsx",
+    "Toaster": "src/components/ui/sonner.tsx",
+    "BrandMark": "src/components/BrandMark.tsx",
+    "ThemeToggle": "src/components/ThemeToggle.tsx"
+  },
+  "dtsPropsFor": {
+    "Button": "variant?: \"default\" | \"secondary\" | \"outline\" | \"ghost\" | \"destructive\" | \"link\"; size?: \"default\" | \"xs\" | \"sm\" | \"lg\" | \"icon\" | \"icon-xs\" | \"icon-sm\" | \"icon-lg\"; asChild?: boolean; className?: string; disabled?: boolean; onClick?: React.MouseEventHandler; children?: React.ReactNode",
+    "Badge": "variant?: \"default\" | \"secondary\" | \"destructive\" | \"outline\" | \"ghost\" | \"link\"; asChild?: boolean; className?: string; children?: React.ReactNode",
+    "BrandMark": "className?: string; iconClassName?: string; landing?: boolean",
+    "Skeleton": "className?: string; children?: React.ReactNode"
+  },
+  "overrides": {
+    "Dialog": { "cardMode": "single", "viewport": "760x520" },
+    "AlertDialog": { "cardMode": "single", "viewport": "760x520" },
+    "DropdownMenu": { "cardMode": "single", "viewport": "520x420" },
+    "Toaster": { "cardMode": "single", "viewport": "640x520" }
+  }
+}
