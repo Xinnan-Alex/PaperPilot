@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Electron" version="30.0.4">
+  <diagram name="Agent Chat Flow" id="0">
+    <mxGraphModel dx="1019" dy="655" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1260" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontStyle=1;" value="Agent Chat Flow" vertex="1">
+          <mxGeometry height="24" width="500" x="40" y="8" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ll_u" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;fillColor=#dae8fc;strokeColor=#6c8ebf;size=40;fontStyle=1;" value="User" vertex="1">
+          <mxGeometry height="890" width="130" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ll_f" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;fillColor=#dae8fc;strokeColor=#6c8ebf;size=40;fontStyle=1;" value="Frontend" vertex="1">
+          <mxGeometry height="890" width="130" x="240" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ll_a" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;fillColor=#ffe6cc;strokeColor=#d79b00;size=40;fontStyle=1;" value="API" vertex="1">
+          <mxGeometry height="890" width="130" x="440" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ll_llm" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;fillColor=#e1d5e7;strokeColor=#9673a6;size=40;fontStyle=1;" value="LiteLLM Provider" vertex="1">
+          <mxGeometry height="890" width="130" x="640" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ll_t" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;fillColor=#fff2cc;strokeColor=#d6b656;size=40;fontStyle=1;" value="Tool Handler" vertex="1">
+          <mxGeometry height="890" width="130" x="840" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ll_db" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;fillColor=#d5e8d4;strokeColor=#82b366;size=40;fontStyle=1;" value="Postgres / Tavily" vertex="1">
+          <mxGeometry height="890" width="130" x="1040" y="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="loopframe" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;fontSize=11;align=left;verticalAlign=top;fontStyle=2;" value="loop  [agent loop · max 5 iterations]" vertex="1">
+          <mxGeometry height="500" width="890" x="255" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="altframe" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;fontSize=11;align=left;verticalAlign=top;fontStyle=2;" value="alt  [tool calls present]" vertex="1">
+          <mxGeometry height="320" width="850" x="275" y="458" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note_jwt" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;size=10;" value="Bearer JWT" vertex="1">
+          <mxGeometry height="28" width="120" x="582" y="196" as="geometry" />
+        </mxCell>
+        <mxCell id="note_append" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;size=10;" value="Append tool result to conversation" vertex="1">
+          <mxGeometry height="30" width="200" x="405" y="684" as="geometry" />
+        </mxCell>
+        <mxCell id="note_break" parent="1" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;size=10;" value="Break loop, emit sources and done" vertex="1">
+          <mxGeometry height="30" width="200" x="405" y="742" as="geometry" />
+        </mxCell>
+        <mxCell id="divider" parent="1" style="html=1;endArrow=none;startArrow=none;dashed=1;strokeColor=#999999;" edge="1" value="">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="276" y="726" as="sourcePoint" /><mxPoint x="1124" y="726" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="divlabel" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;fontColor=#666666;" value="[else]  no tool calls" vertex="1">
+          <mxGeometry height="18" width="160" x="285" y="712" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m1" parent="1" style="html=1;endArrow=block;startArrow=none;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="Type question, select model, submit">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="105" y="140" as="sourcePoint" /><mxPoint x="305" y="140" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m2" parent="1" style="html=1;endArrow=block;startArrow=none;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="POST /chat (SSE)">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="305" y="185" as="sourcePoint" /><mxPoint x="505" y="185" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m3" parent="1" style="html=1;endArrow=block;startArrow=none;rounded=0;fontSize=11;" edge="1" value="">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="240" as="sourcePoint" /><mxPoint x="505" y="268" as="targetPoint" /><Array as="points"><mxPoint x="575" y="240" /><mxPoint x="575" y="268" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="t3" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" value="Verify JWT, resolve model via provider registry" vertex="1">
+          <mxGeometry height="20" width="330" x="585" y="244" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m4" parent="1" style="html=1;endArrow=block;startArrow=none;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="stream_completion (with tools)">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="345" as="sourcePoint" /><mxPoint x="705" y="345" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m5" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="token stream or tool_calls">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="705" y="388" as="sourcePoint" /><mxPoint x="505" y="388" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m6" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="SSE event: token">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="430" as="sourcePoint" /><mxPoint x="305" y="430" as="targetPoint" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="m7" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="SSE event: tool_call">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="500" as="sourcePoint" /><mxPoint x="305" y="500" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m8" parent="1" style="html=1;endArrow=block;startArrow=none;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="dispatch tool">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="540" as="sourcePoint" /><mxPoint x="905" y="540" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m9" parent="1" style="html=1;endArrow=block;startArrow=none;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="search / list / summarise / web search">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="905" y="580" as="sourcePoint" /><mxPoint x="1105" y="580" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m10" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="results">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="1105" y="618" as="sourcePoint" /><mxPoint x="905" y="618" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m11" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="tool result">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="905" y="656" as="sourcePoint" /><mxPoint x="505" y="656" as="targetPoint" /></mxGeometry>
+        </mxCell>
+
+        <mxCell id="m12" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="SSE event: sources">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="828" as="sourcePoint" /><mxPoint x="305" y="828" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m13" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="SSE event: done">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="505" y="866" as="sourcePoint" /><mxPoint x="305" y="866" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m14" parent="1" style="html=1;endArrow=open;startArrow=none;dashed=1;strokeColor=#777777;rounded=0;fontSize=11;verticalAlign=bottom;" edge="1" value="Final answer with citations and tool bubbles">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="305" y="904" as="sourcePoint" /><mxPoint x="105" y="904" as="targetPoint" /></mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
