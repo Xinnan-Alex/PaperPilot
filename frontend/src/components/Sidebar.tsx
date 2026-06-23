@@ -188,7 +188,10 @@ export default function Sidebar({
           <span className="text-lg font-semibold tracking-tight">PaperPilot</span>
         </div>
         <div className="flex items-center gap-1">
-          <ThemeToggle />
+          {/* Mobile chat header has its own toggle; only show here on desktop. */}
+          <span className="hidden md:inline-flex">
+            <ThemeToggle />
+          </span>
           <Button
             variant="ghost"
             size="icon"

@@ -1,0 +1,74 @@
+name: terraform
+
+on:
+  pull_request:
+    paths: ["infra/**"]
+  push:
+    branches: [main]
+    paths: ["infra/**"]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+defaults:
+  run:
+    working-directory: infra
+
+jobs:
+  # plan on PRs — read-only role, posts the plan as a comment
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::501519530452:role/paperpilot-tf-plan
+          aws-region: ap-southeast-5
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.6"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -input=false
+      - run: terraform validate
+      - id: plan
+        run: terraform plan -input=false -lock=false -no-color
+        continue-on-error: true
+      - uses: actions/github-script@v7
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+          OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const marker = "<!-- tf-plan -->";
+            const plan = (process.env.PLAN || "").slice(0, 60000);
+            const body = `${marker}\n#### terraform plan \`${process.env.OUTCOME}\`\n\`\`\`\n${plan}\n\`\`\``;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const old = comments.find(c => c.body.includes(marker));
+            if (old) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: old.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+      - if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # apply on merge to main — write role
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::501519530452:role/paperpilot-tf-apply
+          aws-region: ap-southeast-5
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.6"
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -auto-approve

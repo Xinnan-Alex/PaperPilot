@@ -23,7 +23,18 @@ dist-ssr
 *.sln
 *.sw?
 
-# design-sync
+# Capacitor native build artifacts
+ios/App/Pods
+ios/App/App/public
+ios/App/Podfile.lock
+android/.gradle
+android/app/build
+android/app/src/main/assets/public
+android/capacitor-cordova-android-plugins
+.env.mobile
+.env.mobile.local
+# design-sync (claude.ai/design): committed inputs are config.json, NOTES.md,
+# conventions.md, entry.tsx, previews/. Everything below is generated/staged junk.
 .ds-sync/
 ds-bundle/
 .design-sync/.cache/

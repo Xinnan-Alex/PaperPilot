@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import {
   ArrowLeft,
   ArrowRight,
@@ -6,7 +8,6 @@ import {
   Loader2,
   Moon,
   Quote,
-  Send,
   Sparkles,
   Sun,
 } from "lucide-react";
@@ -14,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
 import { useThemeTransition } from "@/hooks/useThemeTransition";
-import { BrandMark } from "@/components/BrandMark";
+import { BrandMark, PaperPilotNib } from "@/components/BrandMark";
 
 const REPO_URL = "https://github.com/Xinnan-Alex/PaperPilot";
 
@@ -113,11 +114,23 @@ export default function Login() {
   const signIn = async (provider: "github" | "google") => {
     setLoading(provider);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const native = Capacitor.isNativePlatform();
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: native
+            ? "com.leongxinnan.paperpilot://login-callback"
+            : window.location.origin,
+          skipBrowserRedirect: native,
+        },
       });
-      if (error) toast.error(error.message);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      // Native: open the provider in the system browser; the deep-link
+      // callback (registerDeepLinkAuth) completes the session.
+      if (native && data?.url) await Browser.open({ url: data.url });
     } catch {
       toast.error("Failed to start sign-in. Please try again.");
     } finally {
@@ -127,7 +140,7 @@ export default function Login() {
 
   return (
     <div className="landing flex flex-col font-sans">
-      {/* dashed flight path + floating paper plane */}
+      {/* dashed flight path + floating pen nib */}
       <svg
         className="pointer-events-none absolute inset-0 z-0 h-full w-full"
         preserveAspectRatio="none"
@@ -149,7 +162,7 @@ export default function Login() {
         aria-hidden
       >
         <div className="grid h-16 w-16 -rotate-12 place-items-center rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-          <Send className="h-7 w-7" />
+          <PaperPilotNib className="h-7 w-7" />
         </div>
       </div>
 

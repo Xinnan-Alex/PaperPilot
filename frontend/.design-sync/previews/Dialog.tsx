@@ -16,7 +16,11 @@ export function RenameChat() {
         <DialogDescription>
           Give this conversation a name so it's easy to find later.
         </DialogDescription>
+        <label htmlFor="rename-chat-input" className="sr-only">
+          Chat name
+        </label>
         <input
+          id="rename-chat-input"
           defaultValue="Q3 revenue analysis"
           className="mt-4 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         />

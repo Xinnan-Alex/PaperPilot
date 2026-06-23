@@ -39,35 +39,9 @@
 
 ## Architecture
 
-```mermaid
-graph TD
-    A[User Browser] -->|HTTPS / SSE| B[Frontend<br/>S3 + CloudFront]
-    B --> C[Backend API<br/>EC2 t4g · Docker]
+![PaperPilot system architecture](docs/design/readme/system-architecture.drawio.png)
 
-    C --> D[Supabase Storage]
-    C --> E[Supabase Auth<br/>JWT / JWKS]
-    C --> F[Supabase Postgres<br/>pgvector]
-
-    C --> G[LiteLLM<br/>Provider Abstraction]
-    G --> G1[OpenAI]
-    G --> G2[DeepSeek]
-    G --> G3[Groq]
-    G --> G4[Mistral]
-    C --> H[Embedding Provider<br/>Voyage AI]
-    C --> I[Tavily<br/>Web Search optional]
-
-    subgraph agentloop["Agent Loop (up to 5 iterations)"]
-        AL[stream_completion] -->|tool_calls| AT[Tool Dispatch]
-        AT -->|search_documents| AR[Hybrid RAG]
-        AT -->|list_documents| AD[Document List]
-        AT -->|get_document_summary| AS[Doc Summary]
-        AT -->|web_search| AW[Tavily API]
-        AR --> AF[Supabase Postgres]
-        AT -->|results| AL
-    end
-
-    C --> AL
-```
+> Editable source: [system-architecture.drawio](docs/design/readme/system-architecture.drawio) · [SVG](docs/design/readme/system-architecture.svg)
 
 ### Infrastructure (AWS)
 
@@ -77,108 +51,25 @@ Deployed on AWS (`ap-southeast-5`); GitHub Actions ships both tiers on push to `
 
 > Editable source: [aws-architecture.drawio](docs/design/infra/aws-architecture.drawio) · [SVG](docs/design/infra/aws-architecture.svg)
 
+These resources are managed as code in [`infra/`](infra/) (Terraform, remote state in S3) — imported from the console-created originals. PRs run `terraform plan` (posted as a comment); merges to `main` run `terraform apply`, both via GitHub OIDC.
+
 ### Document Upload & Ingestion Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant F as Frontend
-    participant A as API
-    participant S as Supabase
-    participant V as Voyage AI
+![Document upload and ingestion flow](docs/design/readme/upload-ingestion-flow.drawio.png)
 
-    U->>F: Select file and upload
-    F->>A: POST /upload
-    A->>S: Save file to Storage
-    A->>S: Insert document record pending
-    S-->>A: document_id
-    A-->>F: 201 Created
-
-    loop Polling every 2s
-        F->>A: GET /documents/id
-        A->>S: Check status
-        S-->>A: processing
-        A-->>F: 200 processing
-    end
-
-    Note over A: Background worker async
-    A->>A: Extract text OCR if scanned
-    A->>A: Recursive chunking
-    A->>V: Embed chunks voyage-3-lite
-    V-->>A: vector array
-    A->>S: Insert chunks and vectors
-    A->>S: Update status to ready
-
-    F->>A: GET /documents/id
-    A->>S: Check status
-    S-->>A: ready
-    A-->>F: 200 ready
-    F-->>U: Show document as ready
-```
+> Editable source: [upload-ingestion-flow.drawio](docs/design/readme/upload-ingestion-flow.drawio) · [SVG](docs/design/readme/upload-ingestion-flow.svg)
 
 ### Agent Chat Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant F as Frontend
-    participant A as API
-    participant LLM as LiteLLM Provider
-    participant T as Tool Handler
-    participant DB as Postgres / Tavily
+![Agent chat flow](docs/design/readme/agent-chat-flow.drawio.png)
 
-    U->>F: Type question, select model, submit
-    F->>A: POST /chat SSE
-    Note right of A: Bearer JWT
-    A->>A: Verify JWT, resolve model via provider registry
-
-    loop Agent loop max 5 iterations
-        A->>LLM: stream_completion with tools
-        LLM-->>A: token stream or tool_calls
-        A-->>F: SSE event: token
-        alt Tool calls present
-            A-->>F: SSE event: tool_call
-            A->>T: dispatch tool
-            T->>DB: search / list / summarise / web search
-            DB-->>T: results
-            T-->>A: tool result
-            A-->>F: SSE event: tool_result
-            Note over A: Append tool result to conversation
-        else No tool calls
-            Note over A: Break loop, emit sources and done
-        end
-    end
-
-    A-->>F: SSE event: sources
-    A-->>F: SSE event: done
-    F-->>U: Final answer with citations and tool bubbles
-```
+> Editable source: [agent-chat-flow.drawio](docs/design/readme/agent-chat-flow.drawio) · [SVG](docs/design/readme/agent-chat-flow.svg)
 
 ### Authentication Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant F as Frontend
-    participant SA as Supabase Auth
-    participant GH as GitHub OAuth
-    participant A as API
+![Authentication flow](docs/design/readme/auth-flow.drawio.png)
 
-    U->>F: Click Sign in with GitHub
-    F->>SA: signInWithOAuth github
-    SA->>GH: Redirect to GitHub
-    GH-->>U: Consent screen
-    U->>GH: Authorize
-    GH-->>SA: Callback with code
-    SA->>SA: Exchange code for tokens
-    SA-->>F: Session and JWT token
-    F->>A: API request with Bearer JWT
-    A->>A: Verify JWT via JWKS
-    A-->>F: Authenticated response
-```
+> Editable source: [auth-flow.drawio](docs/design/readme/auth-flow.drawio) · [SVG](docs/design/readme/auth-flow.svg)
 
 ### Core Pipeline
 
@@ -302,7 +193,7 @@ paperpilot/
 │   │   │   ├── ToolCallBubble.tsx   # Inline tool activity display
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── UploadBox.tsx
-│   │   │   ├── BrandMark.tsx        # Shared paper-plane logo (sidebar, chat empty-state, landing)
+│   │   │   ├── BrandMark.tsx        # Shared pen-nib logo (sidebar, chat empty-state, landing)
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── hooks/
 │   │   │   ├── useChatSessions.ts
