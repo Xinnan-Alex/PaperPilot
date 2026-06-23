@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import {
   ArrowLeft,
   ArrowRight,
@@ -112,11 +114,23 @@ export default function Login() {
   const signIn = async (provider: "github" | "google") => {
     setLoading(provider);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const native = Capacitor.isNativePlatform();
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: native
+            ? "com.leongxinnan.paperpilot://login-callback"
+            : window.location.origin,
+          skipBrowserRedirect: native,
+        },
       });
-      if (error) toast.error(error.message);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      // Native: open the provider in the system browser; the deep-link
+      // callback (registerDeepLinkAuth) completes the session.
+      if (native && data?.url) await Browser.open({ url: data.url });
     } catch {
       toast.error("Failed to start sign-in. Please try again.");
     } finally {

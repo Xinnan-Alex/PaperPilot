@@ -89,6 +89,35 @@ body {
   font-family: var(--font-sans);
 }
 
+/* iOS (Capacitor) safe-area insets: keep full-height shells clear of the
+   status bar / Dynamic Island and home indicator. env() resolves to 0 on
+   the web (no notch + no viewport-fit=cover effect), so the web build is
+   visually unchanged. Containers are border-box with min-height/height of
+   100svh, so this padding insets content without overflowing. */
+.landing,
+.app-shell {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+}
+
+/* Side drawers (mobile sidebar + docs panel) are Radix-portaled to <body>, so
+   the .app-shell inset above never reaches them — inset them directly. Targeted
+   via the data-side attribute (specificity 0,2,0) so it isn't overridden by the
+   p-0 utility some drawers pass through tailwind-merge. env() = 0 on web. */
+[data-slot="dialog-content"][data-side="left"],
+[data-slot="dialog-content"][data-side="right"] {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+[data-slot="dialog-content"][data-side="left"] {
+  padding-left: env(safe-area-inset-left);
+}
+[data-slot="dialog-content"][data-side="right"] {
+  padding-right: env(safe-area-inset-right);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

@@ -42,14 +42,14 @@ export default function AppPage() {
 
   if (loading) {
     return (
-      <div className="flex h-svh items-center justify-center">
+      <div className="app-shell flex h-svh items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-svh w-full overflow-hidden bg-background">
+    <div className="app-shell flex h-svh w-full overflow-hidden bg-background">
       {/* Sidebar: desktop renders inline; mobile uses Radix Dialog inside Sidebar */}
       <Sidebar
         sessions={sessions}
