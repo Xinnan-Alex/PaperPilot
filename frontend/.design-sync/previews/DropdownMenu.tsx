@@ -20,7 +20,7 @@ export function AccountMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-        <DropdownMenuLabel>alex@paperpilot.app</DropdownMenuLabel>
+        <DropdownMenuLabel>user@example.com</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <Settings /> Settings

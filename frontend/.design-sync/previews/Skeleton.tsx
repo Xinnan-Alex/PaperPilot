@@ -17,6 +17,7 @@ export function DocumentList() {
   );
 }
 
+// The skeleton primitive in its common shapes — circle and bars.
 export function Shapes() {
   return (
     <div className="flex items-center gap-4">

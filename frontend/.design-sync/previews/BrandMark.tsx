@@ -1,5 +1,6 @@
 import { BrandMark } from "paperpilot";
 
+// The mark at the sizes it appears across the app.
 export function Sizes() {
   return (
     <div className="flex items-end gap-4">

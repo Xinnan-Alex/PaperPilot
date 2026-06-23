@@ -1,6 +1,7 @@
 import { Badge } from "paperpilot";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 
+// All badge variants side by side.
 export function Variants() {
   return (
     <div className="flex flex-wrap items-center gap-2">

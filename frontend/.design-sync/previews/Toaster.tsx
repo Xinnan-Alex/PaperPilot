@@ -13,6 +13,7 @@ import { Toaster, toast } from "paperpilot";
 export function Notification() {
   useEffect(() => {
     toast.success("Document ready", {
+      id: "design-sync-preview-toast",
       description: "annual-report.pdf was embedded and is now searchable.",
       duration: Infinity,
     });

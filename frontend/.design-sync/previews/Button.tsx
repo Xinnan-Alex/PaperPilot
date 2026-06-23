@@ -1,6 +1,7 @@
 import { Button } from "paperpilot";
 import { Plus, Send, Trash2, Loader2 } from "lucide-react";
 
+// All button variants, labelled with real app actions.
 export function Variants() {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -14,6 +15,7 @@ export function Variants() {
   );
 }
 
+// The four button sizes, smallest to largest.
 export function Sizes() {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -25,6 +27,7 @@ export function Sizes() {
   );
 }
 
+// Buttons with leading icons, icon-only buttons, and a disabled loading state.
 export function WithIcons() {
   return (
     <div className="flex flex-wrap items-center gap-2">
