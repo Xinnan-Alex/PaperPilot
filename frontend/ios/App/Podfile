@@ -1,3 +1,7 @@
+# NOTE: PNPM hoists Capacitor packages under .pnpm/<pkg>@<version>/, so the paths
+# below are version-pinned. When @capacitor/* deps are upgraded in package.json,
+# update the @<version> segments here to match (run `pnpm why @capacitor/ios` to
+# find the exact dir). `npx cap sync ios` may also overwrite this file — re-apply.
 require_relative '../../node_modules/.pnpm/@capacitor+ios@6.2.1_@capacitor+core@6.2.1/node_modules/@capacitor/ios/scripts/pods_helpers'
 
 platform :ios, '13.0'

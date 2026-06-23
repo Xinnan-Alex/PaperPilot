@@ -96,7 +96,7 @@ export default function AppPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-10 h-8 w-8"
+                className="absolute right-2 top-2 z-10 h-8 w-8"
                 aria-label="Close documents"
               >
                 <X className="h-4 w-4" />
